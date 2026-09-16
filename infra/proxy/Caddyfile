@@ -1,0 +1,10 @@
+{$QUANTHECY_DOMAIN} {
+    encode zstd gzip
+    @backend path /api/* /admin/* /static/*
+    handle @backend {
+        reverse_proxy backend:8000
+    }
+    handle {
+        reverse_proxy web:80
+    }
+}

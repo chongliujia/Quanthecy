@@ -1,0 +1,82 @@
+[
+  {
+    "name": "invalid platform",
+    "path": "/platform",
+    "value": "other"
+  },
+  {
+    "name": "invalid version",
+    "path": "/schema_version",
+    "value": "2"
+  },
+  {
+    "name": "probability above one",
+    "path": "/probability/value",
+    "value": 1.1
+  },
+  {
+    "name": "negative probability",
+    "path": "/probability/value",
+    "value": -0.1
+  },
+  {
+    "name": "numeric string",
+    "path": "/probability/value",
+    "value": "0.6"
+  },
+  {
+    "name": "boolean price",
+    "path": "/probability/value",
+    "value": true
+  },
+  {
+    "name": "invalid basis",
+    "path": "/probability/basis",
+    "value": "PROBABILITY"
+  },
+  {
+    "name": "invalid unit",
+    "path": "/volume/unit",
+    "value": "DOLLARS"
+  },
+  {
+    "name": "negative volume",
+    "path": "/volume/value",
+    "value": -1
+  },
+  {
+    "name": "invalid UUID",
+    "path": "/market/id",
+    "value": "123"
+  },
+  {
+    "name": "naive time",
+    "path": "/received_at",
+    "value": "2026-01-01T12:00:00"
+  },
+  {
+    "name": "non-UTC time",
+    "path": "/received_at",
+    "value": "2026-01-01T20:00:00+08:00"
+  },
+  {
+    "name": "invalid date",
+    "path": "/received_at",
+    "value": "2026-02-30T12:00:00Z"
+  },
+  {
+    "name": "null receipt",
+    "path": "/received_at",
+    "value": null
+  },
+  {
+    "name": "missing outcome",
+    "path": "/outcome",
+    "value": null
+  },
+  {
+    "name": "invalid digest",
+    "path": "/provenance/payload_sha256",
+    "value": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  }
+]

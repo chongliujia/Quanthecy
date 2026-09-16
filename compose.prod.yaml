@@ -1,0 +1,52 @@
+x-production-env: &production-env
+  DJANGO_SETTINGS_MODULE: config.settings.prod
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set a fresh production secret}
+  DJANGO_ALLOWED_HOSTS: ${QUANTHECY_DOMAIN:?Set the public DNS name},backend,localhost,127.0.0.1
+  DJANGO_CSRF_TRUSTED_ORIGINS: https://${QUANTHECY_DOMAIN}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set the database password}
+  CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?Set the analytical database password}
+
+services:
+  backend:
+    environment: *production-env
+    ports: !reset []
+    restart: unless-stopped
+  worker:
+    environment: *production-env
+    restart: unless-stopped
+  migrate:
+    environment: *production-env
+  agent-worker:
+    environment: *production-env
+    restart: unless-stopped
+  news-worker:
+    environment: *production-env
+    restart: unless-stopped
+  web:
+    ports: !reset []
+    restart: unless-stopped
+  market-data:
+    restart: unless-stopped
+  postgres:
+    restart: unless-stopped
+  redis:
+    restart: unless-stopped
+  clickhouse:
+    restart: unless-stopped
+  reverse-proxy:
+    image: caddy:2-alpine
+    environment:
+      QUANTHECY_DOMAIN: ${QUANTHECY_DOMAIN}
+    ports: ['80:80', '443:443']
+    volumes:
+      - ./infra/proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend: {condition: service_healthy}
+      web: {condition: service_healthy}
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

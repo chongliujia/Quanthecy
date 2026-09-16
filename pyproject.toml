@@ -1,0 +1,65 @@
+[project]
+name = "quanthecy"
+version = "0.1.0"
+description = "Prediction-market research and application foundation"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "cryptography>=46,<47",
+  "django>=5.2,<5.3",
+  "django-ninja>=1.7,<2",
+  "pydantic>=2.11,<3",
+  "psycopg[binary]>=3.2,<4",
+  "redis>=6,<7",
+  "uvicorn>=0.35,<1",
+  "whitenoise>=6.9,<7",
+  "jsonschema[format]>=4.23,<5",
+  "polars>=1.30,<2",
+  "defusedxml>=0.7.1,<1",
+]
+
+[dependency-groups]
+dev = [
+  "ruff>=0.12,<1",
+  "pytest>=8.4,<10",
+  "pytest-django>=4.11,<5",
+  "mypy>=1.16,<2",
+  "django-stubs[compatible-mypy]>=5.2,<5.3",
+  "types-jsonschema>=4.23",
+  "types-defusedxml>=0.7",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+pythonpath = ["apps/backend", "python"]
+testpaths = ["apps/backend/tests", "tests"]
+addopts = "-ra --strict-markers"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/migrations/*.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["mypy_django_plugin.main"]
+mypy_path = ["apps/backend", "python"]
+files = ["apps/backend/config", "apps/backend/quanthecy", "python"]
+check_untyped_defs = true
+disallow_untyped_defs = true
+warn_unused_ignores = true
+explicit_package_bases = true
+
+[tool.django-stubs]
+django_settings_module = "config.settings.test"
+
+[[tool.mypy.overrides]]
+module = ["*.migrations.*"]
+disallow_untyped_defs = false

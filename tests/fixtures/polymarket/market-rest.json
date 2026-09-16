@@ -1,0 +1,22 @@
+{
+  "id": "559651",
+  "question": "Xi Jinping out before 2027?",
+  "description": "This market will resolve to \"Yes\" if China's General Secretary of the Communist Party, Xi Jinping, is removed from power for any length of time between July 3, 2025, and December 31, 2026, 11:59 PM ET. Otherwise, this market will resolve to \"No\".\n\nCCP General Secretary Xi Jinping will be considered removed from power if he announces his resignation from his role as General Secretary, or is otherwise dismissed, detained, disqualified, or otherwise loses his position or is prevented from fulfilling his duties as General Secretary within this market's timeframe.\n\nThe primary resolution source for this market will be a consensus of credible reporting.",
+  "outcomes": "[\"Yes\", \"No\"]",
+  "clobTokenIds": "[\"32338220190071351435772801779725302244575775216413325951443816017994629993401\", \"25659310674993675562345759665114759892400026242514633218387667107987341231962\"]",
+  "bestBid": 0.039,
+  "bestAsk": 0.04,
+  "volume": "13246730.589216003",
+  "startDate": "2025-07-03T20:37:00.228Z",
+  "endDate": "2027-01-01T04:59:00Z",
+  "closed": false,
+  "active": true,
+  "umaResolutionStatus": null,
+  "resolutionSource": "",
+  "events": [
+    {
+      "id": "30828",
+      "title": "Xi Jinping out before 2027?"
+    }
+  ]
+}

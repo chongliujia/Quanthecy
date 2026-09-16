@@ -1,0 +1,930 @@
+[
+  {
+    "schema_version": "1.0.0",
+    "observation_id": "6fe35de7-6942-5146-a5c4-4608edb4822a",
+    "platform": "polymarket",
+    "event": {
+      "id": "8ff1ec04-a729-597a-82fd-7218b3606e2e",
+      "exchange_id": "fixture-polymarket-event",
+      "title": "Synthetic research event"
+    },
+    "market": {
+      "id": "7c355de2-d19a-5c86-8fea-728f1bccaead",
+      "exchange_id": "fixture-polymarket-market",
+      "title": "Will the synthetic indicator exceed its threshold?",
+      "description": "Synthetic contract fixture; no live market.",
+      "status": "OPEN",
+      "rules_version": "synthetic-research-fixture-v1",
+      "resolution_rules": "YES if the synthetic indicator is greater than 10 at the specified deadline.",
+      "resolution_source": "Synthetic fixture source",
+      "opens_at": "2026-01-01T00:00:00Z",
+      "closes_at": "2026-02-01T00:00:00Z",
+      "resolved_at": null
+    },
+    "outcome": {
+      "id": "61f452a9-9081-5225-a2f1-76a4428afea8",
+      "exchange_id": "fixture-polymarket-yes",
+      "label": "Yes",
+      "result": "UNKNOWN"
+    },
+    "event_at": null,
+    "received_at": "2026-01-01T12:00:00Z",
+    "recorded_at": "2026-01-01T12:00:00Z",
+    "probability": {
+      "value": 0.4,
+      "basis": "MIDPOINT",
+      "source": "synthetic-fixture:yes_bid_ask",
+      "as_of": "2026-01-01T12:00:00Z"
+    },
+    "best_bid": 0.39,
+    "best_ask": 0.41000000000000003,
+    "volume": {
+      "value": 1100,
+      "unit": "USD",
+      "basis": "synthetic-cumulative-volume",
+      "window_start": null,
+      "as_of": "2026-01-01T12:00:00Z"
+    },
+    "liquidity": null,
+    "quality_flags": [
+      "SOURCE_TIME_MISSING"
+    ],
+    "provenance": {
+      "transport": "REST",
+      "source": "synthetic-fixture",
+      "source_event_id": null,
+      "sequence": null,
+      "payload_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  },
+  {
+    "schema_version": "1.0.0",
+    "observation_id": "f00136ed-a771-5614-b30a-2dd5e1332ee8",
+    "platform": "polymarket",
+    "event": {
+      "id": "8ff1ec04-a729-597a-82fd-7218b3606e2e",
+      "exchange_id": "fixture-polymarket-event",
+      "title": "Synthetic research event"
+    },
+    "market": {
+      "id": "7c355de2-d19a-5c86-8fea-728f1bccaead",
+      "exchange_id": "fixture-polymarket-market",
+      "title": "Will the synthetic indicator exceed its threshold?",
+      "description": "Synthetic contract fixture; no live market.",
+      "status": "OPEN",
+      "rules_version": "synthetic-research-fixture-v1",
+      "resolution_rules": "YES if the synthetic indicator is greater than 10 at the specified deadline.",
+      "resolution_source": "Synthetic fixture source",
+      "opens_at": "2026-01-01T00:00:00Z",
+      "closes_at": "2026-02-01T00:00:00Z",
+      "resolved_at": null
+    },
+    "outcome": {
+      "id": "61f452a9-9081-5225-a2f1-76a4428afea8",
+      "exchange_id": "fixture-polymarket-yes",
+      "label": "Yes",
+      "result": "UNKNOWN"
+    },
+    "event_at": null,
+    "received_at": "2026-01-01T12:01:00Z",
+    "recorded_at": "2026-01-01T12:01:00Z",
+    "probability": {
+      "value": 0.406,
+      "basis": "MIDPOINT",
+      "source": "synthetic-fixture:yes_bid_ask",
+      "as_of": "2026-01-01T12:01:00Z"
+    },
+    "best_bid": 0.396,
+    "best_ask": 0.41600000000000004,
+    "volume": {
+      "value": 1210,
+      "unit": "USD",
+      "basis": "synthetic-cumulative-volume",
+      "window_start": null,
+      "as_of": "2026-01-01T12:01:00Z"
+    },
+    "liquidity": null,
+    "quality_flags": [
+      "SOURCE_TIME_MISSING"
+    ],
+    "provenance": {
+      "transport": "REST",
+      "source": "synthetic-fixture",
+      "source_event_id": null,
+      "sequence": null,
+      "payload_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  },
+  {
+    "schema_version": "1.0.0",
+    "observation_id": "1c025e69-c551-590d-bd04-51e9a274910d",
+    "platform": "polymarket",
+    "event": {
+      "id": "8ff1ec04-a729-597a-82fd-7218b3606e2e",
+      "exchange_id": "fixture-polymarket-event",
+      "title": "Synthetic research event"
+    },
+    "market": {
+      "id": "7c355de2-d19a-5c86-8fea-728f1bccaead",
+      "exchange_id": "fixture-polymarket-market",
+      "title": "Will the synthetic indicator exceed its threshold?",
+      "description": "Synthetic contract fixture; no live market.",
+      "status": "OPEN",
+      "rules_version": "synthetic-research-fixture-v1",
+      "resolution_rules": "YES if the synthetic indicator is greater than 10 at the specified deadline.",
+      "resolution_source": "Synthetic fixture source",
+      "opens_at": "2026-01-01T00:00:00Z",
+      "closes_at": "2026-02-01T00:00:00Z",
+      "resolved_at": null
+    },
+    "outcome": {
+      "id": "61f452a9-9081-5225-a2f1-76a4428afea8",
+      "exchange_id": "fixture-polymarket-yes",
+      "label": "Yes",
+      "result": "UNKNOWN"
+    },
+    "event_at": null,
+    "received_at": "2026-01-01T12:02:00Z",
+    "recorded_at": "2026-01-01T12:02:00Z",
+    "probability": {
+      "value": 0.41200000000000003,
+      "basis": "MIDPOINT",
+      "source": "synthetic-fixture:yes_bid_ask",
+      "as_of": "2026-01-01T12:02:00Z"
+    },
+    "best_bid": 0.402,
+    "best_ask": 0.42200000000000004,
+    "volume": {
+      "value": 1330,
+      "unit": "USD",
+      "basis": "synthetic-cumulative-volume",
+      "window_start": null,
+      "as_of": "2026-01-01T12:02:00Z"
+    },
+    "liquidity": null,
+    "quality_flags": [
+      "SOURCE_TIME_MISSING"
+    ],
+    "provenance": {
+      "transport": "REST",
+      "source": "synthetic-fixture",
+      "source_event_id": null,
+      "sequence": null,
+      "payload_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  },
+  {
+    "schema_version": "1.0.0",
+    "observation_id": "bbee457c-377a-57df-ae16-0b17d00cbd95",
+    "platform": "polymarket",
+    "event": {
+      "id": "8ff1ec04-a729-597a-82fd-7218b3606e2e",
+      "exchange_id": "fixture-polymarket-event",
+      "title": "Synthetic research event"
+    },
+    "market": {
+      "id": "7c355de2-d19a-5c86-8fea-728f1bccaead",
+      "exchange_id": "fixture-polymarket-market",
+      "title": "Will the synthetic indicator exceed its threshold?",
+      "description": "Synthetic contract fixture; no live market.",
+      "status": "OPEN",
+      "rules_version": "synthetic-research-fixture-v1",
+      "resolution_rules": "YES if the synthetic indicator is greater than 10 at the specified deadline.",
+      "resolution_source": "Synthetic fixture source",
+      "opens_at": "2026-01-01T00:00:00Z",
+      "closes_at": "2026-02-01T00:00:00Z",
+      "resolved_at": null
+    },
+    "outcome": {
+      "id": "61f452a9-9081-5225-a2f1-76a4428afea8",
+      "exchange_id": "fixture-polymarket-yes",
+      "label": "Yes",
+      "result": "UNKNOWN"
+    },
+    "event_at": null,
+    "received_at": "2026-01-01T12:03:00Z",
+    "recorded_at": "2026-01-01T12:03:00Z",
+    "probability": {
+      "value": 0.41800000000000004,
+      "basis": "MIDPOINT",
+      "source": "synthetic-fixture:yes_bid_ask",
+      "as_of": "2026-01-01T12:03:00Z"
+    },
+    "best_bid": 0.40800000000000003,
+    "best_ask": 0.42800000000000005,
+    "volume": {
+      "value": 1430,
+      "unit": "USD",
+      "basis": "synthetic-cumulative-volume",
+      "window_start": null,
+      "as_of": "2026-01-01T12:03:00Z"
+    },
+    "liquidity": null,
+    "quality_flags": [
+      "SOURCE_TIME_MISSING"
+    ],
+    "provenance": {
+      "transport": "REST",
+      "source": "synthetic-fixture",
+      "source_event_id": null,
+      "sequence": null,
+      "payload_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  },
+  {
+    "schema_version": "1.0.0",
+    "observation_id": "f3f82505-6003-549e-b652-6f935672a7d3",
+    "platform": "polymarket",
+    "event": {
+      "id": "8ff1ec04-a729-597a-82fd-7218b3606e2e",
+      "exchange_id": "fixture-polymarket-event",
+      "title": "Synthetic research event"
+    },
+    "market": {
+      "id": "7c355de2-d19a-5c86-8fea-728f1bccaead",
+      "exchange_id": "fixture-polymarket-market",
+      "title": "Will the synthetic indicator exceed its threshold?",
+      "description": "Synthetic contract fixture; no live market.",
+      "status": "OPEN",
+      "rules_version": "synthetic-research-fixture-v1",
+      "resolution_rules": "YES if the synthetic indicator is greater than 10 at the specified deadline.",
+      "resolution_source": "Synthetic fixture source",
+      "opens_at": "2026-01-01T00:00:00Z",
+      "closes_at": "2026-02-01T00:00:00Z",
+      "resolved_at": null
+    },
+    "outcome": {
+      "id": "61f452a9-9081-5225-a2f1-76a4428afea8",
+      "exchange_id": "fixture-polymarket-yes",
+      "label": "Yes",
+      "result": "UNKNOWN"
+    },
+    "event_at": null,
+    "received_at": "2026-01-01T12:04:00Z",
+    "recorded_at": "2026-01-01T12:04:00Z",
+    "probability": {
+      "value": 0.42400000000000004,
+      "basis": "MIDPOINT",
+      "source": "synthetic-fixture:yes_bid_ask",
+      "as_of": "2026-01-01T12:04:00Z"
+    },
+    "best_bid": 0.41400000000000003,
+    "best_ask": 0.43400000000000005,
+    "volume": {
+      "value": 1540,
+      "unit": "USD",
+      "basis": "synthetic-cumulative-volume",
+      "window_start": null,
+      "as_of": "2026-01-01T12:04:00Z"
+    },
+    "liquidity": null,
+    "quality_flags": [
+      "SOURCE_TIME_MISSING"
+    ],
+    "provenance": {
+      "transport": "REST",
+      "source": "synthetic-fixture",
+      "source_event_id": null,
+      "sequence": null,
+      "payload_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  },
+  {
+    "schema_version": "1.0.0",
+    "observation_id": "f1672efb-7253-58d7-b052-d4d4aa9f946e",
+    "platform": "polymarket",
+    "event": {
+      "id": "8ff1ec04-a729-597a-82fd-7218b3606e2e",
+      "exchange_id": "fixture-polymarket-event",
+      "title": "Synthetic research event"
+    },
+    "market": {
+      "id": "7c355de2-d19a-5c86-8fea-728f1bccaead",
+      "exchange_id": "fixture-polymarket-market",
+      "title": "Will the synthetic indicator exceed its threshold?",
+      "description": "Synthetic contract fixture; no live market.",
+      "status": "OPEN",
+      "rules_version": "synthetic-research-fixture-v1",
+      "resolution_rules": "YES if the synthetic indicator is greater than 10 at the specified deadline.",
+      "resolution_source": "Synthetic fixture source",
+      "opens_at": "2026-01-01T00:00:00Z",
+      "closes_at": "2026-02-01T00:00:00Z",
+      "resolved_at": null
+    },
+    "outcome": {
+      "id": "61f452a9-9081-5225-a2f1-76a4428afea8",
+      "exchange_id": "fixture-polymarket-yes",
+      "label": "Yes",
+      "result": "UNKNOWN"
+    },
+    "event_at": null,
+    "received_at": "2026-01-01T12:05:00Z",
+    "recorded_at": "2026-01-01T12:05:00Z",
+    "probability": {
+      "value": 0.43000000000000005,
+      "basis": "MIDPOINT",
+      "source": "synthetic-fixture:yes_bid_ask",
+      "as_of": "2026-01-01T12:05:00Z"
+    },
+    "best_bid": 0.42000000000000004,
+    "best_ask": 0.44000000000000006,
+    "volume": {
+      "value": 1660,
+      "unit": "USD",
+      "basis": "synthetic-cumulative-volume",
+      "window_start": null,
+      "as_of": "2026-01-01T12:05:00Z"
+    },
+    "liquidity": null,
+    "quality_flags": [
+      "SOURCE_TIME_MISSING"
+    ],
+    "provenance": {
+      "transport": "REST",
+      "source": "synthetic-fixture",
+      "source_event_id": null,
+      "sequence": null,
+      "payload_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  },
+  {
+    "schema_version": "1.0.0",
+    "observation_id": "20a9430e-62df-599d-b500-f587df6dcf16",
+    "platform": "polymarket",
+    "event": {
+      "id": "8ff1ec04-a729-597a-82fd-7218b3606e2e",
+      "exchange_id": "fixture-polymarket-event",
+      "title": "Synthetic research event"
+    },
+    "market": {
+      "id": "7c355de2-d19a-5c86-8fea-728f1bccaead",
+      "exchange_id": "fixture-polymarket-market",
+      "title": "Will the synthetic indicator exceed its threshold?",
+      "description": "Synthetic contract fixture; no live market.",
+      "status": "OPEN",
+      "rules_version": "synthetic-research-fixture-v1",
+      "resolution_rules": "YES if the synthetic indicator is greater than 10 at the specified deadline.",
+      "resolution_source": "Synthetic fixture source",
+      "opens_at": "2026-01-01T00:00:00Z",
+      "closes_at": "2026-02-01T00:00:00Z",
+      "resolved_at": null
+    },
+    "outcome": {
+      "id": "61f452a9-9081-5225-a2f1-76a4428afea8",
+      "exchange_id": "fixture-polymarket-yes",
+      "label": "Yes",
+      "result": "UNKNOWN"
+    },
+    "event_at": null,
+    "received_at": "2026-01-01T12:06:00Z",
+    "recorded_at": "2026-01-01T12:06:00Z",
+    "probability": {
+      "value": 0.43600000000000005,
+      "basis": "MIDPOINT",
+      "source": "synthetic-fixture:yes_bid_ask",
+      "as_of": "2026-01-01T12:06:00Z"
+    },
+    "best_bid": 0.42600000000000005,
+    "best_ask": 0.44600000000000006,
+    "volume": {
+      "value": 1760,
+      "unit": "USD",
+      "basis": "synthetic-cumulative-volume",
+      "window_start": null,
+      "as_of": "2026-01-01T12:06:00Z"
+    },
+    "liquidity": null,
+    "quality_flags": [
+      "SOURCE_TIME_MISSING"
+    ],
+    "provenance": {
+      "transport": "REST",
+      "source": "synthetic-fixture",
+      "source_event_id": null,
+      "sequence": null,
+      "payload_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  },
+  {
+    "schema_version": "1.0.0",
+    "observation_id": "3d7ae466-426a-5a25-bf5e-dc03c74af2b1",
+    "platform": "polymarket",
+    "event": {
+      "id": "8ff1ec04-a729-597a-82fd-7218b3606e2e",
+      "exchange_id": "fixture-polymarket-event",
+      "title": "Synthetic research event"
+    },
+    "market": {
+      "id": "7c355de2-d19a-5c86-8fea-728f1bccaead",
+      "exchange_id": "fixture-polymarket-market",
+      "title": "Will the synthetic indicator exceed its threshold?",
+      "description": "Synthetic contract fixture; no live market.",
+      "status": "OPEN",
+      "rules_version": "synthetic-research-fixture-v1",
+      "resolution_rules": "YES if the synthetic indicator is greater than 10 at the specified deadline.",
+      "resolution_source": "Synthetic fixture source",
+      "opens_at": "2026-01-01T00:00:00Z",
+      "closes_at": "2026-02-01T00:00:00Z",
+      "resolved_at": null
+    },
+    "outcome": {
+      "id": "61f452a9-9081-5225-a2f1-76a4428afea8",
+      "exchange_id": "fixture-polymarket-yes",
+      "label": "Yes",
+      "result": "UNKNOWN"
+    },
+    "event_at": null,
+    "received_at": "2026-01-01T12:07:00Z",
+    "recorded_at": "2026-01-01T12:07:00Z",
+    "probability": {
+      "value": 0.442,
+      "basis": "MIDPOINT",
+      "source": "synthetic-fixture:yes_bid_ask",
+      "as_of": "2026-01-01T12:07:00Z"
+    },
+    "best_bid": 0.432,
+    "best_ask": 0.452,
+    "volume": {
+      "value": 1870,
+      "unit": "USD",
+      "basis": "synthetic-cumulative-volume",
+      "window_start": null,
+      "as_of": "2026-01-01T12:07:00Z"
+    },
+    "liquidity": null,
+    "quality_flags": [
+      "SOURCE_TIME_MISSING"
+    ],
+    "provenance": {
+      "transport": "REST",
+      "source": "synthetic-fixture",
+      "source_event_id": null,
+      "sequence": null,
+      "payload_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  },
+  {
+    "schema_version": "1.0.0",
+    "observation_id": "e2b74c96-2916-590c-8f61-be776db5a630",
+    "platform": "polymarket",
+    "event": {
+      "id": "8ff1ec04-a729-597a-82fd-7218b3606e2e",
+      "exchange_id": "fixture-polymarket-event",
+      "title": "Synthetic research event"
+    },
+    "market": {
+      "id": "7c355de2-d19a-5c86-8fea-728f1bccaead",
+      "exchange_id": "fixture-polymarket-market",
+      "title": "Will the synthetic indicator exceed its threshold?",
+      "description": "Synthetic contract fixture; no live market.",
+      "status": "OPEN",
+      "rules_version": "synthetic-research-fixture-v1",
+      "resolution_rules": "YES if the synthetic indicator is greater than 10 at the specified deadline.",
+      "resolution_source": "Synthetic fixture source",
+      "opens_at": "2026-01-01T00:00:00Z",
+      "closes_at": "2026-02-01T00:00:00Z",
+      "resolved_at": null
+    },
+    "outcome": {
+      "id": "61f452a9-9081-5225-a2f1-76a4428afea8",
+      "exchange_id": "fixture-polymarket-yes",
+      "label": "Yes",
+      "result": "UNKNOWN"
+    },
+    "event_at": null,
+    "received_at": "2026-01-01T12:08:00Z",
+    "recorded_at": "2026-01-01T12:08:00Z",
+    "probability": {
+      "value": 0.448,
+      "basis": "MIDPOINT",
+      "source": "synthetic-fixture:yes_bid_ask",
+      "as_of": "2026-01-01T12:08:00Z"
+    },
+    "best_bid": 0.438,
+    "best_ask": 0.458,
+    "volume": {
+      "value": 1990,
+      "unit": "USD",
+      "basis": "synthetic-cumulative-volume",
+      "window_start": null,
+      "as_of": "2026-01-01T12:08:00Z"
+    },
+    "liquidity": null,
+    "quality_flags": [
+      "SOURCE_TIME_MISSING"
+    ],
+    "provenance": {
+      "transport": "REST",
+      "source": "synthetic-fixture",
+      "source_event_id": null,
+      "sequence": null,
+      "payload_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  },
+  {
+    "schema_version": "1.0.0",
+    "observation_id": "4b8343e7-8750-5eaf-9b0b-8951ef795c90",
+    "platform": "polymarket",
+    "event": {
+      "id": "8ff1ec04-a729-597a-82fd-7218b3606e2e",
+      "exchange_id": "fixture-polymarket-event",
+      "title": "Synthetic research event"
+    },
+    "market": {
+      "id": "7c355de2-d19a-5c86-8fea-728f1bccaead",
+      "exchange_id": "fixture-polymarket-market",
+      "title": "Will the synthetic indicator exceed its threshold?",
+      "description": "Synthetic contract fixture; no live market.",
+      "status": "OPEN",
+      "rules_version": "synthetic-research-fixture-v1",
+      "resolution_rules": "YES if the synthetic indicator is greater than 10 at the specified deadline.",
+      "resolution_source": "Synthetic fixture source",
+      "opens_at": "2026-01-01T00:00:00Z",
+      "closes_at": "2026-02-01T00:00:00Z",
+      "resolved_at": null
+    },
+    "outcome": {
+      "id": "61f452a9-9081-5225-a2f1-76a4428afea8",
+      "exchange_id": "fixture-polymarket-yes",
+      "label": "Yes",
+      "result": "UNKNOWN"
+    },
+    "event_at": null,
+    "received_at": "2026-01-01T12:09:00Z",
+    "recorded_at": "2026-01-01T12:09:00Z",
+    "probability": {
+      "value": 0.454,
+      "basis": "MIDPOINT",
+      "source": "synthetic-fixture:yes_bid_ask",
+      "as_of": "2026-01-01T12:09:00Z"
+    },
+    "best_bid": 0.444,
+    "best_ask": 0.464,
+    "volume": {
+      "value": 2090,
+      "unit": "USD",
+      "basis": "synthetic-cumulative-volume",
+      "window_start": null,
+      "as_of": "2026-01-01T12:09:00Z"
+    },
+    "liquidity": null,
+    "quality_flags": [
+      "SOURCE_TIME_MISSING"
+    ],
+    "provenance": {
+      "transport": "REST",
+      "source": "synthetic-fixture",
+      "source_event_id": null,
+      "sequence": null,
+      "payload_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  },
+  {
+    "schema_version": "1.0.0",
+    "observation_id": "6b95df5e-6905-5107-8ef7-e8664cc119fe",
+    "platform": "polymarket",
+    "event": {
+      "id": "8ff1ec04-a729-597a-82fd-7218b3606e2e",
+      "exchange_id": "fixture-polymarket-event",
+      "title": "Synthetic research event"
+    },
+    "market": {
+      "id": "7c355de2-d19a-5c86-8fea-728f1bccaead",
+      "exchange_id": "fixture-polymarket-market",
+      "title": "Will the synthetic indicator exceed its threshold?",
+      "description": "Synthetic contract fixture; no live market.",
+      "status": "OPEN",
+      "rules_version": "synthetic-research-fixture-v1",
+      "resolution_rules": "YES if the synthetic indicator is greater than 10 at the specified deadline.",
+      "resolution_source": "Synthetic fixture source",
+      "opens_at": "2026-01-01T00:00:00Z",
+      "closes_at": "2026-02-01T00:00:00Z",
+      "resolved_at": null
+    },
+    "outcome": {
+      "id": "61f452a9-9081-5225-a2f1-76a4428afea8",
+      "exchange_id": "fixture-polymarket-yes",
+      "label": "Yes",
+      "result": "UNKNOWN"
+    },
+    "event_at": null,
+    "received_at": "2026-01-01T12:10:00Z",
+    "recorded_at": "2026-01-01T12:10:00Z",
+    "probability": {
+      "value": 0.46,
+      "basis": "MIDPOINT",
+      "source": "synthetic-fixture:yes_bid_ask",
+      "as_of": "2026-01-01T12:10:00Z"
+    },
+    "best_bid": 0.45,
+    "best_ask": 0.47000000000000003,
+    "volume": {
+      "value": 2200,
+      "unit": "USD",
+      "basis": "synthetic-cumulative-volume",
+      "window_start": null,
+      "as_of": "2026-01-01T12:10:00Z"
+    },
+    "liquidity": null,
+    "quality_flags": [
+      "SOURCE_TIME_MISSING"
+    ],
+    "provenance": {
+      "transport": "REST",
+      "source": "synthetic-fixture",
+      "source_event_id": null,
+      "sequence": null,
+      "payload_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  },
+  {
+    "schema_version": "1.0.0",
+    "observation_id": "db31a5ea-c87a-51ea-8cd1-a38d6f72f836",
+    "platform": "polymarket",
+    "event": {
+      "id": "8ff1ec04-a729-597a-82fd-7218b3606e2e",
+      "exchange_id": "fixture-polymarket-event",
+      "title": "Synthetic research event"
+    },
+    "market": {
+      "id": "7c355de2-d19a-5c86-8fea-728f1bccaead",
+      "exchange_id": "fixture-polymarket-market",
+      "title": "Will the synthetic indicator exceed its threshold?",
+      "description": "Synthetic contract fixture; no live market.",
+      "status": "OPEN",
+      "rules_version": "synthetic-research-fixture-v1",
+      "resolution_rules": "YES if the synthetic indicator is greater than 10 at the specified deadline.",
+      "resolution_source": "Synthetic fixture source",
+      "opens_at": "2026-01-01T00:00:00Z",
+      "closes_at": "2026-02-01T00:00:00Z",
+      "resolved_at": null
+    },
+    "outcome": {
+      "id": "61f452a9-9081-5225-a2f1-76a4428afea8",
+      "exchange_id": "fixture-polymarket-yes",
+      "label": "Yes",
+      "result": "UNKNOWN"
+    },
+    "event_at": null,
+    "received_at": "2026-01-01T12:11:00Z",
+    "recorded_at": "2026-01-01T12:11:00Z",
+    "probability": {
+      "value": 0.466,
+      "basis": "MIDPOINT",
+      "source": "synthetic-fixture:yes_bid_ask",
+      "as_of": "2026-01-01T12:11:00Z"
+    },
+    "best_bid": 0.456,
+    "best_ask": 0.47600000000000003,
+    "volume": {
+      "value": 2320,
+      "unit": "USD",
+      "basis": "synthetic-cumulative-volume",
+      "window_start": null,
+      "as_of": "2026-01-01T12:11:00Z"
+    },
+    "liquidity": null,
+    "quality_flags": [
+      "SOURCE_TIME_MISSING"
+    ],
+    "provenance": {
+      "transport": "REST",
+      "source": "synthetic-fixture",
+      "source_event_id": null,
+      "sequence": null,
+      "payload_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  },
+  {
+    "schema_version": "1.0.0",
+    "observation_id": "fa251f3a-426b-5a13-8911-42f2aec77961",
+    "platform": "polymarket",
+    "event": {
+      "id": "8ff1ec04-a729-597a-82fd-7218b3606e2e",
+      "exchange_id": "fixture-polymarket-event",
+      "title": "Synthetic research event"
+    },
+    "market": {
+      "id": "7c355de2-d19a-5c86-8fea-728f1bccaead",
+      "exchange_id": "fixture-polymarket-market",
+      "title": "Will the synthetic indicator exceed its threshold?",
+      "description": "Synthetic contract fixture; no live market.",
+      "status": "OPEN",
+      "rules_version": "synthetic-research-fixture-v1",
+      "resolution_rules": "YES if the synthetic indicator is greater than 10 at the specified deadline.",
+      "resolution_source": "Synthetic fixture source",
+      "opens_at": "2026-01-01T00:00:00Z",
+      "closes_at": "2026-02-01T00:00:00Z",
+      "resolved_at": null
+    },
+    "outcome": {
+      "id": "61f452a9-9081-5225-a2f1-76a4428afea8",
+      "exchange_id": "fixture-polymarket-yes",
+      "label": "Yes",
+      "result": "UNKNOWN"
+    },
+    "event_at": null,
+    "received_at": "2026-01-01T12:12:00Z",
+    "recorded_at": "2026-01-01T12:12:00Z",
+    "probability": {
+      "value": 0.47200000000000003,
+      "basis": "MIDPOINT",
+      "source": "synthetic-fixture:yes_bid_ask",
+      "as_of": "2026-01-01T12:12:00Z"
+    },
+    "best_bid": 0.462,
+    "best_ask": 0.48200000000000004,
+    "volume": {
+      "value": 2420,
+      "unit": "USD",
+      "basis": "synthetic-cumulative-volume",
+      "window_start": null,
+      "as_of": "2026-01-01T12:12:00Z"
+    },
+    "liquidity": null,
+    "quality_flags": [
+      "SOURCE_TIME_MISSING"
+    ],
+    "provenance": {
+      "transport": "REST",
+      "source": "synthetic-fixture",
+      "source_event_id": null,
+      "sequence": null,
+      "payload_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  },
+  {
+    "schema_version": "1.0.0",
+    "observation_id": "dd878046-fb0b-5e2d-9104-d91d0dd3c18a",
+    "platform": "polymarket",
+    "event": {
+      "id": "8ff1ec04-a729-597a-82fd-7218b3606e2e",
+      "exchange_id": "fixture-polymarket-event",
+      "title": "Synthetic research event"
+    },
+    "market": {
+      "id": "7c355de2-d19a-5c86-8fea-728f1bccaead",
+      "exchange_id": "fixture-polymarket-market",
+      "title": "Will the synthetic indicator exceed its threshold?",
+      "description": "Synthetic contract fixture; no live market.",
+      "status": "OPEN",
+      "rules_version": "synthetic-research-fixture-v1",
+      "resolution_rules": "YES if the synthetic indicator is greater than 10 at the specified deadline.",
+      "resolution_source": "Synthetic fixture source",
+      "opens_at": "2026-01-01T00:00:00Z",
+      "closes_at": "2026-02-01T00:00:00Z",
+      "resolved_at": null
+    },
+    "outcome": {
+      "id": "61f452a9-9081-5225-a2f1-76a4428afea8",
+      "exchange_id": "fixture-polymarket-yes",
+      "label": "Yes",
+      "result": "UNKNOWN"
+    },
+    "event_at": null,
+    "received_at": "2026-01-01T12:13:00Z",
+    "recorded_at": "2026-01-01T12:13:00Z",
+    "probability": {
+      "value": 0.47800000000000004,
+      "basis": "MIDPOINT",
+      "source": "synthetic-fixture:yes_bid_ask",
+      "as_of": "2026-01-01T12:13:00Z"
+    },
+    "best_bid": 0.468,
+    "best_ask": 0.48800000000000004,
+    "volume": {
+      "value": 2530,
+      "unit": "USD",
+      "basis": "synthetic-cumulative-volume",
+      "window_start": null,
+      "as_of": "2026-01-01T12:13:00Z"
+    },
+    "liquidity": null,
+    "quality_flags": [
+      "SOURCE_TIME_MISSING"
+    ],
+    "provenance": {
+      "transport": "REST",
+      "source": "synthetic-fixture",
+      "source_event_id": null,
+      "sequence": null,
+      "payload_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  },
+  {
+    "schema_version": "1.0.0",
+    "observation_id": "c5bcec7f-184b-5a06-8e3e-350699848c43",
+    "platform": "polymarket",
+    "event": {
+      "id": "8ff1ec04-a729-597a-82fd-7218b3606e2e",
+      "exchange_id": "fixture-polymarket-event",
+      "title": "Synthetic research event"
+    },
+    "market": {
+      "id": "7c355de2-d19a-5c86-8fea-728f1bccaead",
+      "exchange_id": "fixture-polymarket-market",
+      "title": "Will the synthetic indicator exceed its threshold?",
+      "description": "Synthetic contract fixture; no live market.",
+      "status": "OPEN",
+      "rules_version": "synthetic-research-fixture-v1",
+      "resolution_rules": "YES if the synthetic indicator is greater than 10 at the specified deadline.",
+      "resolution_source": "Synthetic fixture source",
+      "opens_at": "2026-01-01T00:00:00Z",
+      "closes_at": "2026-02-01T00:00:00Z",
+      "resolved_at": null
+    },
+    "outcome": {
+      "id": "61f452a9-9081-5225-a2f1-76a4428afea8",
+      "exchange_id": "fixture-polymarket-yes",
+      "label": "Yes",
+      "result": "UNKNOWN"
+    },
+    "event_at": null,
+    "received_at": "2026-01-01T12:14:00Z",
+    "recorded_at": "2026-01-01T12:14:00Z",
+    "probability": {
+      "value": 0.48400000000000004,
+      "basis": "MIDPOINT",
+      "source": "synthetic-fixture:yes_bid_ask",
+      "as_of": "2026-01-01T12:14:00Z"
+    },
+    "best_bid": 0.47400000000000003,
+    "best_ask": 0.49400000000000005,
+    "volume": {
+      "value": 2650,
+      "unit": "USD",
+      "basis": "synthetic-cumulative-volume",
+      "window_start": null,
+      "as_of": "2026-01-01T12:14:00Z"
+    },
+    "liquidity": null,
+    "quality_flags": [
+      "SOURCE_TIME_MISSING"
+    ],
+    "provenance": {
+      "transport": "REST",
+      "source": "synthetic-fixture",
+      "source_event_id": null,
+      "sequence": null,
+      "payload_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  },
+  {
+    "schema_version": "1.0.0",
+    "observation_id": "b6229ac5-7698-53e2-9ef9-6a87b0bde650",
+    "platform": "polymarket",
+    "event": {
+      "id": "8ff1ec04-a729-597a-82fd-7218b3606e2e",
+      "exchange_id": "fixture-polymarket-event",
+      "title": "Synthetic research event"
+    },
+    "market": {
+      "id": "7c355de2-d19a-5c86-8fea-728f1bccaead",
+      "exchange_id": "fixture-polymarket-market",
+      "title": "Will the synthetic indicator exceed its threshold?",
+      "description": "Synthetic contract fixture; no live market.",
+      "status": "OPEN",
+      "rules_version": "synthetic-research-fixture-v1",
+      "resolution_rules": "YES if the synthetic indicator is greater than 10 at the specified deadline.",
+      "resolution_source": "Synthetic fixture source",
+      "opens_at": "2026-01-01T00:00:00Z",
+      "closes_at": "2026-02-01T00:00:00Z",
+      "resolved_at": null
+    },
+    "outcome": {
+      "id": "61f452a9-9081-5225-a2f1-76a4428afea8",
+      "exchange_id": "fixture-polymarket-yes",
+      "label": "Yes",
+      "result": "UNKNOWN"
+    },
+    "event_at": null,
+    "received_at": "2026-01-01T12:15:00Z",
+    "recorded_at": "2026-01-01T12:15:00Z",
+    "probability": {
+      "value": 0.49,
+      "basis": "MIDPOINT",
+      "source": "synthetic-fixture:yes_bid_ask",
+      "as_of": "2026-01-01T12:15:00Z"
+    },
+    "best_bid": 0.45,
+    "best_ask": 0.53,
+    "volume": {
+      "value": 3650,
+      "unit": "USD",
+      "basis": "synthetic-cumulative-volume",
+      "window_start": null,
+      "as_of": "2026-01-01T12:15:00Z"
+    },
+    "liquidity": null,
+    "quality_flags": [
+      "SOURCE_TIME_MISSING"
+    ],
+    "provenance": {
+      "transport": "REST",
+      "source": "synthetic-fixture",
+      "source_event_id": null,
+      "sequence": null,
+      "payload_sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+    }
+  }
+]

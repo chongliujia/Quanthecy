@@ -1,0 +1,16 @@
+.git
+.agents
+.codex
+.env
+.env.*
+!.env.example
+.venv
+**/__pycache__
+**/node_modules
+**/dist
+**/target
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.cache
+**/staticfiles

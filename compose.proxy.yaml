@@ -1,0 +1,26 @@
+# Optional Linux-only local development override for a proxy bound to host loopback.
+# Copy to compose.override.yaml to enable automatically for ordinary Compose commands.
+services:
+  postgres:
+    ports: ['127.0.0.1:15432:5432']
+  clickhouse:
+    ports: ['127.0.0.1:18124:8123']
+  redis:
+    ports: ['127.0.0.1:16380:6379']
+  news-worker:
+    network_mode: host
+    networks: !reset []
+    environment:
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: '15432'
+      NEWS_PROXY_URL: ${COLLECTOR_EGRESS_PROXY:-http://127.0.0.1:7897}
+  market-data:
+    network_mode: host
+    networks: !reset []
+    environment:
+      COLLECTOR_BIND: 127.0.0.1:8080
+      CLICKHOUSE_URL: http://127.0.0.1:18124
+      REDIS_URL: redis://127.0.0.1:16380/0
+      HTTP_PROXY: ${COLLECTOR_EGRESS_PROXY:-http://127.0.0.1:7897}
+      HTTPS_PROXY: ${COLLECTOR_EGRESS_PROXY:-http://127.0.0.1:7897}
+      NO_PROXY: localhost,127.0.0.1

@@ -1,0 +1,486 @@
+{
+  "$defs": {
+    "ActivityValue": {
+      "additionalProperties": false,
+      "properties": {
+        "as_of": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,6})?Z$",
+          "title": "As Of",
+          "type": "string"
+        },
+        "basis": {
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Basis",
+          "type": "string"
+        },
+        "unit": {
+          "enum": [
+            "USD",
+            "CONTRACTS"
+          ],
+          "title": "Unit",
+          "type": "string"
+        },
+        "value": {
+          "minimum": 0,
+          "title": "Value",
+          "type": "number"
+        },
+        "window_start": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,6})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Window Start"
+        }
+      },
+      "required": [
+        "value",
+        "unit",
+        "basis",
+        "window_start",
+        "as_of"
+      ],
+      "title": "ActivityValue",
+      "type": "object"
+    },
+    "Event": {
+      "additionalProperties": false,
+      "properties": {
+        "exchange_id": {
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Exchange Id",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "exchange_id",
+        "title"
+      ],
+      "title": "Event",
+      "type": "object"
+    },
+    "Market": {
+      "additionalProperties": false,
+      "properties": {
+        "closes_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,6})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Closes At"
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "exchange_id": {
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Exchange Id",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "opens_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,6})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Opens At"
+        },
+        "resolution_rules": {
+          "title": "Resolution Rules",
+          "type": "string"
+        },
+        "resolution_source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Resolution Source"
+        },
+        "resolved_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,6})?Z$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Resolved At"
+        },
+        "rules_version": {
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Rules Version",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "OPEN",
+            "CLOSED",
+            "RESOLVED",
+            "CANCELLED",
+            "UNKNOWN"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "exchange_id",
+        "title",
+        "description",
+        "status",
+        "rules_version",
+        "resolution_rules",
+        "resolution_source",
+        "opens_at",
+        "closes_at",
+        "resolved_at"
+      ],
+      "title": "Market",
+      "type": "object"
+    },
+    "Outcome": {
+      "additionalProperties": false,
+      "properties": {
+        "exchange_id": {
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Exchange Id",
+          "type": "string"
+        },
+        "id": {
+          "format": "uuid",
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "result": {
+          "enum": [
+            "WON",
+            "LOST",
+            "VOID",
+            "UNKNOWN"
+          ],
+          "title": "Result",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "exchange_id",
+        "label",
+        "result"
+      ],
+      "title": "Outcome",
+      "type": "object"
+    },
+    "ProbabilityValue": {
+      "additionalProperties": false,
+      "properties": {
+        "as_of": {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,6})?Z$",
+          "title": "As Of",
+          "type": "string"
+        },
+        "basis": {
+          "enum": [
+            "LAST_TRADE",
+            "MIDPOINT",
+            "BEST_BID",
+            "BEST_ASK"
+          ],
+          "title": "Basis",
+          "type": "string"
+        },
+        "source": {
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Source",
+          "type": "string"
+        },
+        "value": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Value",
+          "type": "number"
+        }
+      },
+      "required": [
+        "value",
+        "basis",
+        "source",
+        "as_of"
+      ],
+      "title": "ProbabilityValue",
+      "type": "object"
+    },
+    "Provenance": {
+      "additionalProperties": false,
+      "properties": {
+        "payload_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Payload Sha256",
+          "type": "string"
+        },
+        "sequence": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Sequence"
+        },
+        "source": {
+          "maxLength": 255,
+          "minLength": 1,
+          "title": "Source",
+          "type": "string"
+        },
+        "source_event_id": {
+          "anyOf": [
+            {
+              "maxLength": 255,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Source Event Id"
+        },
+        "transport": {
+          "enum": [
+            "REST",
+            "WEBSOCKET",
+            "BACKFILL"
+          ],
+          "title": "Transport",
+          "type": "string"
+        }
+      },
+      "required": [
+        "transport",
+        "source",
+        "source_event_id",
+        "sequence",
+        "payload_sha256"
+      ],
+      "title": "Provenance",
+      "type": "object"
+    }
+  },
+  "$id": "urn:quanthecy:market-observation:1.0.0",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "best_ask": {
+      "anyOf": [
+        {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Best Ask"
+    },
+    "best_bid": {
+      "anyOf": [
+        {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Best Bid"
+    },
+    "event": {
+      "$ref": "#/$defs/Event"
+    },
+    "event_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,6})?Z$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Event At"
+    },
+    "liquidity": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ActivityValue"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "market": {
+      "$ref": "#/$defs/Market"
+    },
+    "observation_id": {
+      "format": "uuid",
+      "title": "Observation Id",
+      "type": "string"
+    },
+    "outcome": {
+      "$ref": "#/$defs/Outcome"
+    },
+    "platform": {
+      "enum": [
+        "polymarket",
+        "kalshi"
+      ],
+      "title": "Platform",
+      "type": "string"
+    },
+    "probability": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProbabilityValue"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "provenance": {
+      "$ref": "#/$defs/Provenance"
+    },
+    "quality_flags": {
+      "items": {
+        "enum": [
+          "STALE",
+          "GAP",
+          "OUT_OF_ORDER",
+          "SOURCE_TIME_MISSING",
+          "PARTIAL",
+          "CROSSED_BOOK"
+        ],
+        "type": "string"
+      },
+      "title": "Quality Flags",
+      "type": "array"
+    },
+    "received_at": {
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,6})?Z$",
+      "title": "Received At",
+      "type": "string"
+    },
+    "recorded_at": {
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,6})?Z$",
+      "title": "Recorded At",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "volume": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ActivityValue"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "observation_id",
+    "platform",
+    "event",
+    "market",
+    "outcome",
+    "event_at",
+    "received_at",
+    "recorded_at",
+    "probability",
+    "best_bid",
+    "best_ask",
+    "volume",
+    "liquidity",
+    "quality_flags",
+    "provenance"
+  ],
+  "title": "MarketObservation",
+  "type": "object"
+}

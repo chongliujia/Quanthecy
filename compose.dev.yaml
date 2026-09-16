@@ -1,0 +1,41 @@
+services:
+  backend:
+    image: quanthecy-backend:dev
+    build: {target: development}
+    volumes:
+      - ./apps/backend:/app/apps/backend
+      - ./python:/app/python
+  worker:
+    image: quanthecy-backend:dev
+    build: {target: development}
+    volumes:
+      - ./apps/backend:/app/apps/backend
+      - ./python:/app/python
+  migrate:
+    image: quanthecy-backend:dev
+    build: {target: development}
+    volumes:
+      - ./apps/backend:/app/apps/backend
+  agent-worker:
+    image: quanthecy-backend:dev
+    build: {target: development}
+    volumes:
+      - ./apps/backend:/app/apps/backend
+      - ./python:/app/python
+  news-worker:
+    image: quanthecy-backend:dev
+    build: {target: development}
+    volumes:
+      - ./apps/backend:/app/apps/backend
+      - ./python:/app/python
+  web:
+    image: quanthecy-web:dev
+    build: {target: development}
+    environment: {BACKEND_URL: 'http://backend:8000'}
+    ports: !override ['127.0.0.1:${WEB_PORT:-3000}:3000']
+    volumes:
+      - ./apps/web/src:/app/src
+      - ./apps/web/index.html:/app/index.html
+      - ./apps/web/vite.config.ts:/app/vite.config.ts
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1:3000/]

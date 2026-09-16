@@ -1,0 +1,42 @@
+[
+  {
+    "slug": "fed-september-2026-no-change",
+    "title": "September FOMC · No change",
+    "left": {
+      "platform": "polymarket",
+      "exchange_id": "2252244",
+      "rules_version": "aa47955a1c160e62db31086824c4272890b286cc005fce1f8c44b3db3e0c086f"
+    },
+    "right": {
+      "platform": "kalshi",
+      "exchange_id": "KXFEDDECISION-26SEP-H0",
+      "rules_version": "f1650123e9b5b7f9fc6c303650426f4bcedcdc4b32a83d4ef5d3d64225b4a8b9"
+    },
+    "relation": "RELATED",
+    "alignment": "SAME",
+    "confidence": 0.9,
+    "rationale": "Both YES outcomes refer to the same scheduled September 2026 FOMC decision. Material settlement differences require a qualified comparison.",
+    "differences": "Settlement wording: Polymarket uses the upper bound of the target federal funds range and rounds a non-listed change up to the nearest 25 bps. The collected Kalshi rules specify exact mutually exclusive change buckets; they do not state that rounding convention.\nCancellation / missing statement: Kalshi resolves the maintain-rate bucket Yes if the scheduled meeting is canceled and does not occur on its scheduled date. Polymarket waits until the end date of the next scheduled meeting for a statement before falling back to No change.\nTiming metadata: Polymarket reports a close of 2026-09-16 00:00 UTC; Kalshi reports 2026-09-16 17:59 UTC. These are retained as supplied and are not assumed to be the same trading deadline.\nSource / contract: Both concern the September 2026 FOMC decision, but only the source text captured with each review has been compared. Polymarket names the Fed statement and upper-bound definition; the collected Kalshi market rules use hike wording (0 bps means maintain). Full venue rulebooks are outside this review.\nFees / liquidity: The displayed midpoint difference excludes fees, execution costs and slippage. Volume units differ across venues and are not summed. A related-contract difference does not establish an executable arbitrage.",
+    "reviewer_label": "Codex · source-text review, not independently human-reviewed"
+  },
+  {
+    "slug": "fed-september-2026-hike-25",
+    "title": "September FOMC · 25 bp hike",
+    "left": {
+      "platform": "polymarket",
+      "exchange_id": "2252245",
+      "rules_version": "9a5e44f89cf9de09dae87c82302e492264cf7b73764e8a840ee98c822a8750c0"
+    },
+    "right": {
+      "platform": "kalshi",
+      "exchange_id": "KXFEDDECISION-26SEP-H25",
+      "rules_version": "680b5a9ed2482fbe3a1003aef1332b904b73598a3bb31ea9ca30f6d99a6870a3"
+    },
+    "relation": "RELATED",
+    "alignment": "SAME",
+    "confidence": 0.9,
+    "rationale": "Both YES outcomes refer to the same scheduled September 2026 FOMC decision. Material settlement differences require a qualified comparison.",
+    "differences": "Settlement wording: Polymarket uses the upper bound of the target federal funds range and rounds a non-listed change up to the nearest 25 bps. The collected Kalshi rules specify exact mutually exclusive change buckets; they do not state that rounding convention.\nCancellation / missing statement: Kalshi resolves the maintain-rate bucket Yes if the scheduled meeting is canceled and does not occur on its scheduled date. Polymarket waits until the end date of the next scheduled meeting for a statement before falling back to No change.\nTiming metadata: Polymarket reports a close of 2026-09-16 00:00 UTC; Kalshi reports 2026-09-16 17:59 UTC. These are retained as supplied and are not assumed to be the same trading deadline.\nSource / contract: Both concern the September 2026 FOMC decision, but only the source text captured with each review has been compared. Polymarket names the Fed statement and upper-bound definition; the collected Kalshi market rules use hike wording (0 bps means maintain). Full venue rulebooks are outside this review.\nFees / liquidity: The displayed midpoint difference excludes fees, execution costs and slippage. Volume units differ across venues and are not summed. A related-contract difference does not establish an executable arbitrage.",
+    "reviewer_label": "Codex · source-text review, not independently human-reviewed"
+  }
+]

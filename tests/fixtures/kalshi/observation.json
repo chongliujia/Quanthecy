@@ -1,0 +1,56 @@
+{
+  "schema_version": "1.0.0",
+  "observation_id": "00000000-0000-0000-0000-000000000002",
+  "platform": "kalshi",
+  "event": {
+    "id": "00000000-0000-0000-0000-00000000000c",
+    "exchange_id": "fixture-kalshi-event",
+    "title": "Synthetic research event"
+  },
+  "market": {
+    "id": "00000000-0000-0000-0000-000000000016",
+    "exchange_id": "fixture-kalshi-market",
+    "title": "Will the synthetic indicator exceed its threshold?",
+    "description": "Synthetic contract fixture; no live market.",
+    "status": "OPEN",
+    "rules_version": "fixture-v1",
+    "resolution_rules": "YES if the synthetic indicator is greater than 10 at the specified deadline.",
+    "resolution_source": "Synthetic fixture source",
+    "opens_at": "2026-01-01T00:00:00Z",
+    "closes_at": "2026-02-01T00:00:00Z",
+    "resolved_at": null
+  },
+  "outcome": {
+    "id": "00000000-0000-0000-0000-000000000020",
+    "exchange_id": "fixture-kalshi-yes",
+    "label": "Yes",
+    "result": "UNKNOWN"
+  },
+  "event_at": "2026-01-01T12:00:00Z",
+  "received_at": "2026-01-01T12:00:00.100000Z",
+  "recorded_at": "2026-01-01T12:00:00.200000Z",
+  "probability": {
+    "value": 0.6,
+    "basis": "MIDPOINT",
+    "source": "fixture-orderbook",
+    "as_of": "2026-01-01T12:00:00Z"
+  },
+  "best_bid": 0.59,
+  "best_ask": 0.61,
+  "volume": {
+    "value": 1200,
+    "unit": "CONTRACTS",
+    "basis": "fixture-source-reported-24h-volume",
+    "window_start": "2025-12-31T12:00:00Z",
+    "as_of": "2026-01-01T12:00:00Z"
+  },
+  "liquidity": null,
+  "quality_flags": [],
+  "provenance": {
+    "transport": "REST",
+    "source": "synthetic-fixture",
+    "source_event_id": null,
+    "sequence": null,
+    "payload_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+  }
+}

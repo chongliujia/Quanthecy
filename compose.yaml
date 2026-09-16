@@ -1,0 +1,170 @@
+name: quanthecy
+
+x-python: &python
+  image: quanthecy-backend:local
+  build:
+    context: .
+    dockerfile: apps/backend/Dockerfile
+    target: production
+  environment: &python-env
+    DJANGO_SETTINGS_MODULE: config.settings.dev
+    DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-quanthecy-local-development-only-do-not-use-in-production}
+    DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
+    DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+    POSTGRES_HOST: postgres
+    POSTGRES_DB: ${POSTGRES_DB:-quanthecy}
+    POSTGRES_USER: ${POSTGRES_USER:-quanthecy}
+    POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-quanthecy-dev-only}
+    REDIS_URL: redis://redis:6379/0
+    CLICKHOUSE_URL: http://clickhouse:8123
+    CLICKHOUSE_DATABASE: ${CLICKHOUSE_DATABASE:-quanthecy}
+    CLICKHOUSE_USER: ${CLICKHOUSE_USER:-quanthecy}
+    CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-quanthecy-dev-only}
+    NEWS_FEEDS_ENABLED: ${NEWS_FEEDS_ENABLED:-true}
+    NEWS_PROXY_URL: ${NEWS_PROXY_URL:-}
+    AGENT_ENCRYPTION_KEY: ${AGENT_ENCRYPTION_KEY:-}
+    AGENT_ALLOWED_ENDPOINTS: ${AGENT_ALLOWED_ENDPOINTS:-}
+  init: true
+  stop_grace_period: 30s
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-quanthecy}
+      POSTGRES_USER: ${POSTGRES_USER:-quanthecy}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-quanthecy-dev-only}
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  redis:
+    image: redis:7.4-alpine
+    command: [redis-server, --appendonly, 'yes', --maxmemory, 128mb, --maxmemory-policy, allkeys-lru]
+    volumes: [redis_data:/data]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.8
+    environment:
+      CLICKHOUSE_DB: ${CLICKHOUSE_DATABASE:-quanthecy}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-quanthecy}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-quanthecy-dev-only}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: '1'
+    volumes: [clickhouse_data:/var/lib/clickhouse]
+    healthcheck:
+      test: [CMD-SHELL, 'clickhouse-client --user "$$CLICKHOUSE_USER" --password "$$CLICKHOUSE_PASSWORD" --query "SELECT 1"']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+    ulimits:
+      nofile: {soft: 262144, hard: 262144}
+  migrate:
+    <<: *python
+    command: [python, apps/backend/manage.py, setup_storage]
+    depends_on:
+      postgres: {condition: service_healthy}
+      clickhouse: {condition: service_healthy}
+  backend:
+    <<: *python
+    ports: ['127.0.0.1:${BACKEND_PORT:-8000}:8000']
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+      clickhouse: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, 'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8000/ready", timeout=12)']
+      interval: 15s
+      timeout: 13s
+      retries: 5
+      start_period: 20s
+  worker:
+    <<: *python
+    command: [python, apps/backend/manage.py, runworker]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+      clickhouse: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, 'from pathlib import Path; import time; assert time.time() - Path("/tmp/quanthecy-worker-heartbeat").stat().st_mtime < 35']
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+  news-worker:
+    <<: *python
+    command: [python, apps/backend/manage.py, runnewsworker]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+    healthcheck:
+      test: [CMD, python, -c, 'from pathlib import Path; import time; assert time.time() - Path("/tmp/quanthecy-news-heartbeat").stat().st_mtime < 90']
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+  agent-worker:
+    <<: *python
+    command: [python, apps/backend/manage.py, runagentworker]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      clickhouse: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, 'from pathlib import Path; import time; assert time.time() - Path("/tmp/quanthecy-agent-heartbeat").stat().st_mtime < 45']
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+  market-data:
+    image: quanthecy-market-data:local
+    build:
+      context: .
+      dockerfile: services/market-data/Dockerfile
+    init: true
+    stop_grace_period: 30s
+    environment:
+      RUST_LOG: info
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_DATABASE: ${CLICKHOUSE_DATABASE:-quanthecy}
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-quanthecy}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-quanthecy-dev-only}
+      REDIS_URL: redis://redis:6379/0
+      POLYMARKET_API_URL: ${POLYMARKET_API_URL:-https://gamma-api.polymarket.com}
+      KALSHI_API_URL: ${KALSHI_API_URL:-https://external-api.kalshi.com/trade-api/v2}
+      POLYMARKET_MARKET_IDS: ${POLYMARKET_MARKET_IDS:-}
+      KALSHI_MARKET_TICKERS: ${KALSHI_MARKET_TICKERS:-}
+      COLLECTOR_INTERVAL_SECONDS: ${COLLECTOR_INTERVAL_SECONDS:-60}
+      COLLECTOR_MARKETS_PER_PLATFORM: ${COLLECTOR_MARKETS_PER_PLATFORM:-10}
+    volumes: [collector_data:/var/lib/quanthecy]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, quanthecy-market-data, healthcheck]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+  web:
+    image: quanthecy-web:local
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      target: production
+    ports: ['127.0.0.1:${WEB_PORT:-3000}:80']
+    depends_on:
+      backend: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1/health]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  postgres_data:
+  clickhouse_data:
+  redis_data:
+  collector_data:

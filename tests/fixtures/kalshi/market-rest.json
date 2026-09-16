@@ -1,0 +1,21 @@
+{
+  "ticker": "KXELONMARS-99",
+  "event_ticker": "KXELONMARS-99",
+  "title": "Will Elon Musk visit Mars before Aug 1, 2099?",
+  "market_type": "binary",
+  "notional_value_dollars": "1.0000",
+  "status": "active",
+  "result": "",
+  "yes_bid_dollars": "0.1000",
+  "yes_ask_dollars": "0.1200",
+  "yes_bid_size_fp": "79.35",
+  "yes_ask_size_fp": "265.22",
+  "volume_fp": "118801.05",
+  "liquidity_dollars": "0.0000",
+  "rules_primary": "If Elon Musk visits Mars before the earlier of his death or Aug 1, 2099, then the market resolves to Yes.",
+  "rules_secondary": "",
+  "open_time": "2025-08-28T20:45:00Z",
+  "close_time": "2099-08-01T04:59:00Z",
+  "settlement_ts": null,
+  "updated_time": "2026-04-09T09:31:16.616867Z"
+}

@@ -1,0 +1,15 @@
+{
+  "repository": "chongliujia/Quanthecy",
+  "description": "Quanthecy — An open-source research terminal for prediction markets, with traceable evidence and AI analysis.",
+  "topics": [
+    "prediction-markets",
+    "polymarket",
+    "kalshi",
+    "market-research",
+    "quantitative-finance",
+    "data-quality",
+    "ai-agents",
+    "self-hosted"
+  ],
+  "social_preview": "docs/brand/social-preview.png"
+}

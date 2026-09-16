@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Setup and documentation / 安装与文档
+    url: https://github.com/chongliujia/Quanthecy#quick-start
+    about: Start the platform locally and explore the documentation / 本地启动平台并查看文档。
+  - name: Contribution guide / 贡献指南
+    url: https://github.com/chongliujia/Quanthecy/blob/main/CONTRIBUTING.md
+    about: Find the development workflow and review expectations / 查看开发流程与评审要求。

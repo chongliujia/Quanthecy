@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="title description">
+  <title id="title">Quanthecy — prediction-market research you can trace</title>
+  <desc id="description">Open-source research terminal for Polymarket and Kalshi. Market signals, contract rules, versioned evidence, and AI research.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#0b111a"/>
+      <stop offset="1" stop-color="#12242c"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="#4ed2c4"/>
+      <stop offset="1" stop-color="#8cabef"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="640" fill="url(#background)"/>
+  <rect x="24" y="24" width="1232" height="592" rx="24" fill="none" stroke="#2b414b"/>
+  <rect x="58" y="58" width="58" height="58" rx="15" fill="#4ed2c4"/>
+  <text x="87" y="100" text-anchor="middle" fill="#10232b" font-family="Arial, sans-serif" font-size="43" font-weight="700">Q</text>
+  <text x="134" y="100" fill="#eef4fa" font-family="Arial, sans-serif" font-size="42" font-weight="700" letter-spacing="-1.5">Quanthecy</text>
+  <g font-family="Arial, sans-serif">
+    <text x="60" y="177" fill="#7fc7c0" font-size="15" font-weight="700" letter-spacing="2.5">OPEN-SOURCE RESEARCH TERMINAL</text>
+    <text x="56" y="257" fill="#eef4fa" font-size="58" font-weight="700" letter-spacing="-2">Prediction markets.</text>
+    <text x="56" y="328" fill="#eef4fa" font-size="58" font-weight="700" letter-spacing="-2">Research you can trace.</text>
+    <rect x="60" y="366" width="88" height="4" rx="2" fill="url(#accent)"/>
+    <text x="60" y="417" fill="#c1cedd" font-size="25">Polymarket + Kalshi</text>
+    <text x="60" y="461" fill="#91a5b7" font-size="20">Market signals · Versioned evidence · AI research</text>
+    <path d="M60 529 H1220" stroke="#2b414b"/>
+    <text x="60" y="571" fill="#bdccdb" font-size="19">github.com/chongliujia/Quanthecy</text>
+    <text x="1220" y="571" text-anchor="end" fill="#83a59e" font-size="15" letter-spacing="1">SELF-HOSTED · APACHE-2.0</text>
+  </g>
+  <g font-family="Arial, sans-serif">
+    <text x="860" y="120" fill="#78939f" font-size="12" font-weight="700" letter-spacing="2">FOLLOW THE RESEARCH</text>
+    <path d="M885 178 V435" fill="none" stroke="url(#accent)" stroke-width="2"/>
+    <g fill="#14232f" stroke="#314752">
+      <rect x="854" y="148" width="352" height="65" rx="12"/>
+      <rect x="854" y="235" width="352" height="65" rx="12"/>
+      <rect x="854" y="322" width="352" height="65" rx="12"/>
+      <rect x="854" y="409" width="352" height="65" rx="12" fill="#15322f" stroke="#37645d"/>
+    </g>
+    <g fill="#4ed2c4">
+      <circle cx="885" cy="180" r="6"/>
+      <circle cx="885" cy="267" r="6"/>
+      <circle cx="885" cy="354" r="6"/>
+      <circle cx="885" cy="441" r="6"/>
+    </g>
+    <g fill="#e0e9f2" font-size="21" font-weight="700">
+      <text x="909" y="188">Observe the market</text>
+      <text x="909" y="275">Read the contract</text>
+      <text x="909" y="362">Inspect the evidence</text>
+      <text x="909" y="449">Build a research case</text>
+    </g>
+    <text x="1205" y="502" text-anchor="end" fill="#78939f" font-size="11" letter-spacing="1">ILLUSTRATIVE WORKFLOW</text>
+  </g>
+</svg>

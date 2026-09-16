@@ -1,0 +1,38 @@
+name: Bug report / 问题反馈
+description: Report a reproducible problem / 反馈可复现的问题
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        English and Chinese are welcome. Please remove API keys, passwords, cookies, and private account details from logs and screenshots.
+        欢迎使用中文或英文。请移除日志和截图中的 API 密钥、密码、Cookie 和私人账号信息。
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened? / 发生了什么？
+      description: Describe the problem and the behavior you expected / 描述问题及预期行为。
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce / 复现步骤
+      placeholder: |
+        1. Open / 打开 ...
+        2. Select / 选择 ...
+        3. Observe / 观察 ...
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment / 运行环境
+      description: Commit or version, OS, browser, Docker Compose version, and deployment mode / 提交或版本、系统、浏览器、Compose 版本及部署方式。
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Relevant logs or screenshots / 相关日志或截图
+      description: For data issues, include the exchange, market identifier, observation time, and timezone. Do not include credentials. / 数据问题请提供交易所、市场标识、观测时间和时区，不要包含凭据。

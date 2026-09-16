@@ -1,0 +1,28 @@
+name: Feature request / 功能建议
+description: Suggest a research or developer workflow improvement / 建议改进研究或开发流程
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Tell us about the workflow you want to improve. English and Chinese are welcome.
+        请说明你希望改善的实际使用流程，欢迎中文或英文。
+  - type: textarea
+    id: problem
+    attributes:
+      label: User need / 用户需求
+      description: Who needs this, and what are they trying to do? / 谁需要此功能，希望完成什么任务？
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior / 建议的行为
+      description: Give a concrete example of the expected result / 提供一个预期结果的具体例子。
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and context / 替代方案与背景
+      description: Include related issues, data sources, or an existing workaround if available / 如有相关 Issue、数据来源或现有处理方式，请一并说明。

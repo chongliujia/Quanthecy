@@ -1,5 +1,6 @@
 use crate::{
     adapters::{continuity, normalize, number},
+    selection::Selection,
     spool::{Error, Spool},
 };
 use chrono::Utc;
@@ -295,19 +296,72 @@ impl Collector {
         }
     }
 
+    async fn refresh_selection(&mut self) {
+        let result = tokio::time::timeout(Duration::from_secs(2), async {
+            let client = redis::Client::open(self.redis_url.as_str())?;
+            let mut connection = client.get_multiplexed_async_connection().await?;
+            // GETRANGE bounds the read before decoding even if a broken publisher writes a huge value.
+            let raw: Vec<u8> = redis::cmd("GETRANGE")
+                .arg("collector:selection:v1")
+                .arg(0)
+                .arg(65536)
+                .query_async(&mut connection)
+                .await?;
+            if !raw.is_empty() {
+                match Selection::parse(&raw)
+                    .and_then(|selection| self.spool.apply_selection(selection))
+                {
+                    Ok(()) => {}
+                    Err(_) => warn!("operator selection rejected; retaining last good selection"),
+                }
+            }
+            if let Some(selection) = &self.spool.journal.selection {
+                let ack = json!({"revision":selection.revision,"enabled":selection.enabled,
+                    "collector_id":self.spool.journal.collector_id,
+                    "checked_at":crate::adapters::timestamp(Utc::now())});
+                redis::cmd("SET")
+                    .arg("collector:selection-status:v1")
+                    .arg(ack.to_string())
+                    .arg("EX")
+                    .arg(300)
+                    .query_async::<()>(&mut connection)
+                    .await?;
+            }
+            Ok::<(), Error>(())
+        })
+        .await;
+        if !matches!(result, Ok(Ok(()))) {
+            warn!("operator selection unavailable; retaining last good selection");
+        }
+    }
+
     async fn cycle(&mut self, status: &Status) -> Result<(), Error> {
         self.deliver().await?;
+        self.refresh_selection().await;
+        let managed = self
+            .spool
+            .journal
+            .selection
+            .as_ref()
+            .filter(|selection| selection.enabled)
+            .cloned();
         let mut observations = Vec::new();
         let mut payloads = Vec::new();
         let mut failures = 0;
         for platform in ["polymarket", "kalshi"] {
-            if let Err(error) = self.discover(platform).await {
+            if managed.is_none()
+                && let Err(error) = self.discover(platform).await
+            {
                 failures += 1;
                 warn!(%platform, error_type = %error, "discovery failed");
                 self.source_status(platform, Some(&error.to_string())).await;
                 continue;
             }
-            let ids = self.spool.journal.universe[platform].clone();
+            let ids = managed.as_ref().map_or_else(
+                || self.spool.journal.universe[platform].clone(),
+                |selection| selection.universe[platform].clone(),
+            );
+            let mut source_error = None;
             for id in ids {
                 let base = if platform == "polymarket" {
                     &self.poly_url
@@ -352,18 +406,18 @@ impl Collector {
                         {
                             continuity(old, &mut observation, self.interval as i64);
                         }
-                        self.source_status(platform, None).await;
                         observations.push(observation);
                         payloads.push(raw);
                     }
                     Err(error) => {
                         failures += 1;
                         warn!(%platform, market_id = %id, error_type = %error, "snapshot failed");
-                        self.source_status(platform, Some(&error.to_string())).await;
+                        source_error = Some(error.to_string());
                     }
                 }
                 tokio::time::sleep(Duration::from_millis(250)).await;
             }
+            self.source_status(platform, source_error.as_deref()).await;
         }
         if !observations.is_empty() {
             let staged_at = crate::adapters::timestamp(Utc::now());
@@ -374,7 +428,8 @@ impl Collector {
             self.deliver().await?;
         }
         let snapshot = json!({"status":if failures == 0 {"ready"} else {"degraded"},"mode":"rest_snapshots",
-            "collection_enabled":true,"interval_seconds":self.interval,"universe":self.spool.journal.universe,
+            "collection_enabled":true,"interval_seconds":self.interval,"universe":managed.as_ref().map_or(&self.spool.journal.universe, |selection| &selection.universe),
+            "selection_revision":self.spool.journal.selection.as_ref().map(|selection| selection.revision),
             "collector_id":self.spool.journal.collector_id,"last_batch_id":self.spool.journal.batch_id,
             "last_cycle_at":crate::adapters::timestamp(Utc::now()),"failures":failures});
         *status.write().await = snapshot;

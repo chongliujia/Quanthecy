@@ -28,12 +28,13 @@ def markets(
     request: HttpRequest,
     platform: Literal["polymarket", "kalshi"] | None = None,
     search: str = Query("", max_length=200),
+    topic: str = Query("", max_length=50),
     sort: Literal["recent", "movement", "volume_anomaly"] = "recent",
     offset: int = Query(0, ge=0, le=100000),
     limit: int = Query(20, ge=1, le=100),
 ) -> MarketPage:
     return services.list_markets(
-        platform=platform, search=search, sort=sort, offset=offset, limit=limit
+        platform=platform, search=search, sort=sort, offset=offset, limit=limit, topic=topic
     )
 
 

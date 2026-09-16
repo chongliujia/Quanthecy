@@ -20,6 +20,7 @@ def create_organization(
     name: str,
     kind: str = Organization.Kind.TEAM,
 ) -> Organization:
+    owner = User.objects.select_for_update(no_key=True).get(pk=owner.pk)
     if not owner.is_active:
         raise PermissionDenied("An active owner is required")
     name = name.strip()
@@ -87,6 +88,7 @@ def _protect_last_owner(target: OrganizationMembership) -> None:
         and not OrganizationMembership.objects.filter(
             organization_id=target.organization_id,
             role=Role.OWNER,
+            user__is_active=True,
         )
         .exclude(id=target.id)
         .exists()

@@ -4,6 +4,7 @@ use std::sync::LazyLock;
 
 pub mod adapters;
 pub mod collector;
+pub mod selection;
 pub mod spool;
 
 static CONTRACT: LazyLock<Validator> = LazyLock::new(|| {

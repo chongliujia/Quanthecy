@@ -180,6 +180,65 @@ def test_team_workflow_persists_stages_scoped_inputs_and_abstention(
     assert response.json()["steps"][0]["output"]["summary"]
 
 
+@pytest.mark.parametrize("risk_count", [12, 13, 36, 65])
+def test_risk_review_preserves_peer_limitations_and_never_retries_overflow(
+    client, actor, organization, configured, market, rows, risk_count
+):
+    cutoff = datetime.fromisoformat(rows[-1]["recorded_at"])
+    run = enqueue(
+        actor, organization.id, uuid4(), market_id=market.id, cutoff=cutoff, workflow="team"
+    )
+    limitations = [f"Distinct source limitation [{i:03d}]." for i in range(risk_count)]
+    packets = []
+
+    def provider(connection, system, prompt, stopped):
+        packet = json.loads(prompt)
+        packets.append(packet)
+        stage = len(packets)
+        output = team_output(final=stage == 5)
+        if stage <= 3:
+            # Each independent specialist can now preserve more than four caveats.
+            output["limitations"] = limitations[:12]
+        elif stage == 4:
+            assert packet["output_limits"]["limitations"] == 12
+            assert sum(len(p["limitations"]) for p in packet["peer_findings"].values()) == 36
+            output["limitations"] = limitations
+        else:
+            combined = "\n".join(packet["peer_findings"]["risk"]["limitations"])
+            assert all(item in combined for item in limitations)
+            output["risk_flags"] = limitations
+        return json.dumps(output), {"total_tokens": 10}
+
+    repo = Mock(history=Mock(return_value=rows))
+    with patch("quanthecy.agents.context.history_repository", return_value=repo):
+        assert process_one(Event(), provider)
+        assert not process_one(Event(), provider)
+    run.refresh_from_db()
+    assert run.prompt_version == "research-team-v5"
+    assert run.reserved_calls == 5
+    if risk_count <= 64:
+        assert run.state == "SUCCEEDED", run.validation_errors
+        for items in (run.steps[3]["output"]["limitations"], run.report["risk_flags"]):
+            assert all(item in "\n".join(items) for item in limitations)
+        assert len(packets) == run.usage["provider_calls"] == 5
+        response = client.get(f"/api/v1/organizations/{organization.id}/agent/runs/{run.id}")
+        assert response.status_code == 200
+        assert response.json()["steps"][1]["output"]["limitations"] == limitations[:12]
+        for step_index in (3, 4):
+            adjustments = response.json()["steps"][step_index]["format_adjustments"]
+            if risk_count > 12:
+                assert adjustments[0]["original_count"] == risk_count
+                assert adjustments[0]["grouped_count"] == 12
+            else:
+                assert adjustments == []
+    else:
+        assert run.state == "FAILED" and run.report is None
+        assert run.steps[3]["output"] is None
+        assert all(s["state"] == "SUCCEEDED" for s in run.steps[:3])
+        assert run.validation_errors == [{"field": "limitations", "code": "too_many"}]
+        assert len(packets) == run.usage["provider_calls"] == 4
+
+
 @pytest.mark.parametrize("interruption", ["bad_citation", "provider", "cancel", "settings", "role"])
 def test_team_stops_between_stages_without_publishing_partial_report(
     actor, organization, configured, market, rows, interruption
@@ -412,6 +471,97 @@ def test_job_publishes_validated_report_with_saved_context(
     provider.assert_called_once()
 
 
+def test_large_output_configuration_saves_without_model_call_and_rejects_over_cap(
+    client, actor, organization, configured
+):
+    path = f"/api/v1/organizations/{organization.id}/agent/configuration"
+    values = payload()
+    values.update(revision=configured.revision, enabled=True, max_output_tokens=65536)
+    with patch("quanthecy.agents.provider.complete") as provider:
+        response = client.put(path, data=json.dumps(values), content_type="application/json")
+        assert response.status_code == 200
+        assert response.json()["max_output_tokens"] == 65536
+        assert response.json()["max_output_tokens_limit"] == 65536
+        values.update(revision=response.json()["revision"], max_output_tokens=65537)
+        assert (
+            client.put(path, data=json.dumps(values), content_type="application/json").status_code
+            == 422
+        )
+        provider.assert_not_called()
+    assert not AgentRun.objects.exists()
+
+
+@pytest.mark.parametrize("workflow", ["single", "team"])
+def test_large_budget_request_keeps_lease_alive_beyond_original_timeout(
+    actor, organization, configured, market, rows, workflow
+):
+    configured.max_output_tokens = 32768
+    configured.save()
+    run = enqueue(
+        actor,
+        organization.id,
+        uuid4(),
+        market_id=market.id,
+        cutoff=datetime.fromisoformat(rows[-1]["recorded_at"]),
+        workflow=workflow,
+    )
+    calls = []
+
+    def provider(connection, system, prompt, stopped):
+        calls.append(prompt)
+        assert connection.max_output_tokens == 32768
+        assert connection.timeout_seconds == 300
+        later = timezone.now() + timedelta(minutes=4)
+        with patch("quanthecy.agents.services.timezone.now", return_value=later):
+            expire_runs()
+        run.refresh_from_db()
+        assert run.state == "RUNNING" and run.lease_expires_at > later
+        output = report() if workflow == "single" else team_output(final=len(calls) == 5)
+        return json.dumps(output), {"total_tokens": 10}
+
+    with patch(
+        "quanthecy.agents.context.history_repository",
+        return_value=Mock(history=Mock(return_value=rows)),
+    ):
+        assert process_one(Event(), provider)
+    run.refresh_from_db()
+    assert run.state == "SUCCEEDED"
+    assert len(calls) == (5 if workflow == "team" else 1)
+
+
+def test_large_provider_response_budget_accepts_reasoning_without_storing_it():
+    connection = Connection("openai_compatible", "https://model.example/v1", "model", "", 65536)
+    response = Mock()
+    response.__enter__ = Mock(return_value=response)
+    response.__exit__ = Mock(return_value=None)
+    response.read.return_value = json.dumps(
+        {
+            "choices": [
+                {
+                    "finish_reason": "stop",
+                    "message": {
+                        "reasoning_content": "synthetic private reasoning " * 12000,
+                        "content": '{"ok":true}',
+                    },
+                }
+            ],
+            "usage": {"completion_tokens": 20000},
+        }
+    ).encode()
+    assert len(response.read.return_value) > 131072
+    opener = Mock()
+    opener.open.return_value = response
+    with patch("quanthecy.agents.provider.build_opener", return_value=opener):
+        text, usage = complete(connection, "Return JSON", "Test")
+        assert text == '{"ok":true}' and usage["completion_tokens"] == 20000
+        assert json.loads(opener.open.call_args.args[0].data)["max_tokens"] == 65536
+        assert opener.open.call_args.kwargs["timeout"] == 300
+        response.read.assert_called_once_with(connection.max_response_bytes + 1)
+        response.read.return_value = b"x" * (connection.max_response_bytes + 1)
+        with pytest.raises(ProviderFailure):
+            complete(connection, "JSON", "Test")
+
+
 def test_invalid_citations_fail_without_exposing_raw_output(
     actor, organization, market, configured
 ):
@@ -504,7 +654,7 @@ def test_adapter_bounds_output_redacts_errors_and_refuses_redirects():
         assert json.loads(raw) == {"ok": True} and usage == {"total_tokens": 4}
         sent = json.loads(opener.open.call_args.args[0].data)
         assert sent["max_completion_tokens"] == 2000 and sent["stream"] is False
-        response.read.return_value = b"x" * 131073
+        response.read.return_value = b"x" * (connection.max_response_bytes + 1)
         with pytest.raises(ProviderFailure, match="^provider_failed$"):
             complete(connection, "JSON", "Test")
     with pytest.raises(ProviderFailure):

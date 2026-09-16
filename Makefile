@@ -11,7 +11,7 @@ dev: setup-local
 down:
 	docker compose down
 logs:
-	docker compose logs -f backend worker news-worker agent-worker market-data
+	docker compose logs -f backend worker news-worker agent-worker maintenance-worker market-data
 migrate:
 	docker compose run --rm migrate
 superuser:

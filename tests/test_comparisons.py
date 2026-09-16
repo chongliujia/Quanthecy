@@ -96,3 +96,11 @@ def test_late_arriving_old_sample_does_not_overwrite_newer_sample(sample):
     old["observation_id"] = "late-old-sample"
     points = aligned_history([old, left], [right], [review], [at, at + timedelta(seconds=30)])
     assert all(p["left"]["observation_id"] == left["observation_id"] for p in points)
+
+
+def test_unflagged_midpoint_mismatch_cannot_become_a_cross_market_difference(sample):
+    left, right, review, at = sample
+    left["probability"]["value"] = 0.99
+    point = compare(left, right, review, at)
+    assert point["difference"] is None
+    assert "LEFT_INVALID_QUOTE" in point["issues"]

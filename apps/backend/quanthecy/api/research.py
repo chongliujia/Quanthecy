@@ -5,7 +5,10 @@ from uuid import UUID
 from django.http import HttpRequest
 from ninja import Query, Router
 
-from quanthecy.research import services
+from quanthecy.markets.topic_schemas import TopicCoverage
+from quanthecy.markets.topics import public_topics
+from quanthecy.research import events, services
+from quanthecy.research.event_schemas import EventDetail, EventSummary
 from quanthecy.research.schemas import (
     ComparisonDetail,
     EvidenceDetail,
@@ -72,3 +75,20 @@ def signals(
     limit: int = Query(50, ge=1, le=100),
 ) -> list[FeedSignal]:
     return services.signal_feed(platform, signal_type, limit)
+
+
+@router.get("/research/topics", response=list[TopicCoverage])
+def topics(request: HttpRequest) -> list[TopicCoverage]:
+    return public_topics()
+
+
+@router.get("/research/events", response=list[EventSummary])
+def research_events(
+    request: HttpRequest, cutoff: datetime | None = None, market_id: UUID | None = None
+) -> list[EventSummary]:
+    return events.event_list(cutoff, market_id)
+
+
+@router.get("/research/events/{slug}", response=EventDetail)
+def research_event(request: HttpRequest, slug: str, cutoff: datetime | None = None) -> EventDetail:
+    return events.event_detail(slug, cutoff)

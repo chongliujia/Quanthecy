@@ -29,6 +29,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "quanthecy.operations.console.AdminLanguageMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -37,13 +38,14 @@ ASGI_APPLICATION = "config.asgi.application"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "quanthecy" / "operations" / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "quanthecy.operations.console.console_context",
             ]
         },
     }
@@ -87,6 +89,7 @@ CSRF_TRUSTED_ORIGINS = [
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 CLICKHOUSE_URL = os.environ.get("CLICKHOUSE_URL", "http://localhost:8123")
 NEWS_FEEDS_ENABLED = os.environ.get("NEWS_FEEDS_ENABLED", "true").lower() == "true"
+NEWS_DOCUMENTS_ENABLED = os.environ.get("NEWS_DOCUMENTS_ENABLED", "true").lower() == "true"
 NEWS_PROXY_URL = os.environ.get("NEWS_PROXY_URL", "")
 AGENT_ENCRYPTION_KEY = os.environ.get("AGENT_ENCRYPTION_KEY", "")
 AGENT_ALLOWED_ENDPOINTS = [

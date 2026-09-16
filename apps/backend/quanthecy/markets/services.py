@@ -12,6 +12,8 @@ from django.utils import timezone
 from quanthecy_analytics.contracts.market import MarketObservation
 from quanthecy_analytics.contracts.validation import validate_observation
 from quanthecy_analytics.exports import export_observations
+from quanthecy_analytics.quality import STALE_SECONDS
+from quanthecy_analytics.quality import VERSION as QUALITY_VERSION
 from quanthecy_analytics.signals import analyze
 from redis import Redis
 
@@ -19,36 +21,43 @@ from .models import Market
 from .repositories import history_repository
 from .schemas import HistoryPage, MarketDetail, MarketPage, MarketSummary, SignalOut, summary_values
 
-STALE_SECONDS = 180
-
 
 def list_markets(
-    *, platform: str | None, search: str, sort: str, offset: int, limit: int
+    *, platform: str | None, search: str, sort: str, offset: int, limit: int, topic: str = ""
 ) -> MarketPage:
     query = Market.objects.all()
+    if topic:
+        from .topics import topic_market_ids
+
+        query = query.filter(id__in=topic_market_ids(topic))
     if platform:
         query = query.filter(platform=platform)
     if search:
         query = query.filter(title__icontains=search)
     if sort in ("movement", "volume_anomaly"):
         query = query.filter(
-            status="OPEN", last_observed_at__gte=timezone.now() - timedelta(seconds=STALE_SECONDS)
+            status="OPEN",
+            last_observed_at__gte=timezone.now() - timedelta(seconds=STALE_SECONDS),
+            last_observed_at__lte=timezone.now(),
+            metrics__quality__version=QUALITY_VERSION,
         )
         if sort == "movement":
-            query = query.filter(probability_change_15m__isnull=False).order_by(
-                Abs("probability_change_15m").desc(), "id"
-            )
+            query = query.filter(
+                probability_change_15m__isnull=False, metrics__quality__price_usable=True
+            ).order_by(Abs("probability_change_15m").desc(), "id")
         else:
-            query = query.filter(volume_zscore__isnull=False).order_by(
-                F("volume_zscore").desc(), "id"
-            )
+            query = query.filter(
+                volume_zscore__isnull=False, metrics__quality__volume_usable=True
+            ).order_by(F("volume_zscore").desc(), "id")
     else:
         query = query.order_by("-last_observed_at", "id")
     total = query.count()
     items = [
         MarketSummary(
             **summary_values(
-                m, (timezone.now() - m.last_observed_at).total_seconds() > STALE_SECONDS
+                m,
+                (timezone.now() - m.last_observed_at).total_seconds() > STALE_SECONDS,
+                timezone.now(),
             )
         )
         for m in query[offset : offset + limit]
@@ -86,10 +95,10 @@ def market_detail(market_id: UUID, cutoff: datetime | None = None) -> MarketDeta
             known_at=at.isoformat(),
             limit=1001,
         )
-        market.metrics = analyze(inputs if len(inputs) <= 1000 else [])[0]
+        market.metrics = analyze(inputs[:1000], truncated=len(inputs) > 1000)[0]
         return MarketDetail(
             **summary_values(
-                market, (at - market.last_observed_at).total_seconds() > STALE_SECONDS
+                market, (at - market.last_observed_at).total_seconds() > STALE_SECONDS, at
             ),
             latest=market.latest,
             live_cache=False,
@@ -108,12 +117,16 @@ def market_detail(market_id: UUID, cutoff: datetime | None = None) -> MarketDeta
                 and market.last_observed_at <= observed <= timezone.now()
             ):
                 market.latest = value
+                market.status = value["market"]["status"]
+                market.title = value["market"]["title"]
                 market.last_observed_at = observed
                 cached = True
     except Exception:
         pass  # Cache loss cannot hide persisted metadata/history.
     stale = (timezone.now() - market.last_observed_at).total_seconds() > STALE_SECONDS
-    return MarketDetail(**summary_values(market, stale), latest=market.latest, live_cache=cached)
+    return MarketDetail(
+        **summary_values(market, stale, timezone.now()), latest=market.latest, live_cache=cached
+    )
 
 
 def window(start: datetime | None, end: datetime | None) -> tuple[datetime, datetime]:

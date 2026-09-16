@@ -3,11 +3,13 @@ from typing import Literal
 from uuid import UUID
 
 from ninja import Schema
-from pydantic import Field
+from pydantic import Field, field_serializer
 from quanthecy_analytics.contracts.market import Market as ContractMarket
 from quanthecy_analytics.contracts.market import Outcome as ContractOutcome
 
 from quanthecy.markets.schemas import SignalOut
+
+from .documents import OfficialDocument
 
 
 class SourceOut(Schema):
@@ -77,6 +79,25 @@ class ComparisonDetail(Schema):
     max_skew_seconds: int = 90
 
 
+class DocumentSummary(Schema):
+    title: str
+    kind: Literal["MONETARY_RELEASE", "SPEECH"]
+    url: str
+    observed_at: datetime
+    extractor_version: str
+    text_sha256: str
+    raw_sha256: str
+    character_count: int
+
+
+class DocumentCollection(Schema):
+    state: Literal["pending", "available", "retrying", "disabled"]
+    last_checked_at: datetime | None
+    last_success_at: datetime | None
+    next_poll_at: datetime
+    error: str
+
+
 class EvidenceOut(Schema):
     id: UUID
     revision_id: UUID
@@ -90,6 +111,13 @@ class EvidenceOut(Schema):
     first_observed_at: datetime
     observed_at: datetime
     content_hash: str
+    document: DocumentSummary | None = None
+
+    @field_serializer("observed_at")
+    def exact_observation_time(self, value: datetime) -> str:
+        # Django's JSON encoder truncates datetimes to milliseconds. This field
+        # is also a historical-version cursor, so every microsecond must survive.
+        return value.isoformat()
 
 
 class EvidencePage(Schema):
@@ -112,6 +140,8 @@ class EvidenceDetail(Schema):
     revisions: list[EvidenceOut]
     links: list[LinkOut]
     cutoff: datetime
+    document: OfficialDocument | None = None
+    document_collection: DocumentCollection | None = None
 
 
 class TimelineEntry(Schema):

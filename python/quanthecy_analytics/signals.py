@@ -6,7 +6,9 @@ from statistics import mean, pstdev
 from typing import Any
 from uuid import NAMESPACE_URL, uuid5
 
-VERSION = "rest-window-v1"
+from .quality import BAD_FLAGS, window_quality
+
+VERSION = "rest-window-v2"
 PARAMETERS = {
     "window_seconds": 900,
     "max_gap_seconds": 150,
@@ -16,10 +18,11 @@ PARAMETERS = {
     "volume_zscore": 3.0,
     "volume_rate_ratio": 2.0,
 }
-BAD_FLAGS = {"GAP", "OUT_OF_ORDER", "STALE", "CROSSED_BOOK"}
 
 
-def analyze(observations: list[dict[str, Any]]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+def analyze(
+    observations: list[dict[str, Any]], *, truncated: bool = False
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     unique = {o["observation_id"]: o for o in observations}
     rows = sorted(unique.values(), key=lambda o: (o["received_at"], o["observation_id"]))
     metrics: dict[str, Any] = {
@@ -31,44 +34,54 @@ def analyze(observations: list[dict[str, Any]]) -> tuple[dict[str, Any], list[di
         "history_ready": False,
         "reason": "insufficient_history",
     }
-    if not rows:
+
+    def unavailable(reason: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        metrics["reason"] = reason
+        metrics["quality"] = window_quality(rows, reason).model_dump()
         return metrics, []
+
+    if truncated:
+        return unavailable("history_truncated")
+    if not rows:
+        return unavailable("insufficient_history")
+    if any(unique[o["observation_id"]] != o for o in observations):
+        return unavailable("conflicting_duplicate")
     last = rows[-1]
     end = datetime.fromisoformat(last["received_at"])
     cutoff = end - timedelta(seconds=PARAMETERS["window_seconds"])
     before = [i for i, o in enumerate(rows) if datetime.fromisoformat(o["received_at"]) <= cutoff]
     if not before:
-        return metrics, []
+        return unavailable("insufficient_history")
     rows = rows[before[-1] :]
     times = [datetime.fromisoformat(o["received_at"]) for o in rows]
     deltas = [(b - a).total_seconds() for a, b in zip(times, times[1:], strict=False)]
     if (cutoff - times[0]).total_seconds() > PARAMETERS["max_gap_seconds"] or len(
         rows
     ) < PARAMETERS["minimum_samples"]:
-        return metrics, []
+        return unavailable("insufficient_history")
     if any(d <= 0 or d > PARAMETERS["max_gap_seconds"] for d in deltas) or any(
         BAD_FLAGS.intersection(o["quality_flags"]) for o in rows
     ):
-        metrics["reason"] = "sampling_gap_or_invalid_quote"
-        return metrics, []
+        return unavailable("sampling_gap_or_invalid_quote")
     if (
         len({(o["market"]["id"], o["outcome"]["id"], o["market"]["rules_version"]) for o in rows})
         != 1
     ):
-        metrics["reason"] = "incompatible_observations"
-        return metrics, []
+        return unavailable("incompatible_observations")
     if any(o["market"]["status"] != "OPEN" for o in rows):
-        metrics["reason"] = "market_not_open"
-        return metrics, []
+        return unavailable("market_not_open")
     if any(not o["market"]["resolution_rules"].strip() for o in rows):
-        metrics["reason"] = "missing_resolution_rules"
-        return metrics, []
+        return unavailable("missing_resolution_rules")
+    quality = window_quality(rows)
+    if quality.common_reasons:
+        return unavailable(quality.common_reasons[0])
     metrics.update(
         history_ready=True,
         reason=None,
         window_start=rows[0]["received_at"],
         window_end=last["received_at"],
         sample_count=len(rows),
+        quality=quality.model_dump(),
     )
     signals = []
 
@@ -91,10 +104,7 @@ def analyze(observations: list[dict[str, Any]]) -> tuple[dict[str, Any], list[di
         )
 
     probabilities = [o["probability"] for o in rows]
-    if (
-        all(p and p["basis"] == "MIDPOINT" for p in probabilities)
-        and len({p["source"] for p in probabilities if p}) == 1
-    ):
+    if quality.price_usable:
         change = probabilities[-1]["value"] - probabilities[0]["value"]
         metrics["probability_change_15m"] = change
         if abs(change) >= PARAMETERS["probability_change"]:
@@ -111,10 +121,7 @@ def analyze(observations: list[dict[str, Any]]) -> tuple[dict[str, Any], list[di
             if spread_change >= PARAMETERS["spread_widening"]:
                 emit("SPREAD_WIDENING", spread_change, PARAMETERS["spread_widening"])
     volumes = [o["volume"] for o in rows]
-    if (
-        all(v is not None for v in volumes)
-        and len({(v["unit"], v["basis"]) for v in volumes if v}) == 1
-    ):
+    if quality.volume_usable:
         rates = [
             (b["value"] - a["value"]) / d
             for a, b, d in zip(volumes, volumes[1:], deltas, strict=False)
@@ -132,4 +139,24 @@ def analyze(observations: list[dict[str, Any]]) -> tuple[dict[str, Any], list[di
                     and current >= mean(baseline) * PARAMETERS["volume_rate_ratio"]
                 ):
                     emit("VOLUME_SPIKE", zscore, PARAMETERS["volume_zscore"])
+            else:
+                quality.volume_usable = False
+                quality.volume_reasons.append("constant_volume_baseline")
+        else:
+            quality.volume_usable = False
+            quality.volume_reasons.append("invalid_volume_rate")
+    metrics["quality"] = quality.model_dump()
     return metrics, signals
+
+
+def replay(
+    version: str, observations: list[dict[str, Any]]
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Reproduce stored signals under their original rules, never silently upgrade them."""
+    if version == "rest-window-v1":
+        from .signals_v1 import analyze as legacy_analyze
+
+        return legacy_analyze(observations)
+    if version == VERSION:
+        return analyze(observations)
+    raise ValueError("Unsupported signal calculation version")

@@ -43,6 +43,19 @@ it('switches languages without clearing input and remembers the selection', asyn
   expect(document.documentElement.lang).toBe('en')
 })
 
+it('changes theme without losing login input or language', async () => {
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{}', { status: 401 }))
+  mount()
+  fireEvent.change(await screen.findByLabelText('Email'), { target: { value: 'draft@example.test' } })
+  fireEvent.change(screen.getByRole('combobox', { name: 'Color theme' }), { target: { value: 'light' } })
+  expect(document.documentElement.dataset.theme).toBe('light')
+  fireEvent.click(screen.getByRole('button', { name: '中文' }))
+  fireEvent.change(screen.getByRole('combobox', { name: '颜色主题' }), { target: { value: 'dark' } })
+  expect(screen.getByLabelText('邮箱')).toHaveValue('draft@example.test')
+  expect(document.documentElement.dataset.theme).toBe('dark')
+  expect(document.documentElement.lang).toBe('zh-CN')
+})
+
 it('opens the workspace after login and removes private views on logout', async () => {
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
     const path = String(input)

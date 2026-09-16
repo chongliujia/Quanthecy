@@ -12,6 +12,7 @@ from quanthecy_analytics.comparisons import aligned_history
 from quanthecy.markets.models import Market
 from quanthecy.markets.repositories import history_repository
 
+from .documents import OfficialDocument
 from .models import (
     Comparison,
     ComparisonReview,
@@ -22,6 +23,8 @@ from .models import (
 from .schemas import (
     ComparisonDetail,
     ComparisonPoint,
+    DocumentCollection,
+    DocumentSummary,
     EvidenceDetail,
     EvidenceOut,
     EvidencePage,
@@ -131,10 +134,12 @@ def visible_evidence(at: datetime) -> QuerySet[EvidenceRevision]:
         EvidenceRevision.objects.filter(id=Subquery(latest))
         .filter(Q(published_at__isnull=True) | Q(published_at__lte=at))
         .select_related("item__source")
+        .defer("raw_document")
     )
 
 
 def evidence_value(revision: EvidenceRevision) -> EvidenceOut:
+    document = OfficialDocument.model_validate(revision.document) if revision.document else None
     return EvidenceOut(
         id=revision.item_id,
         revision_id=revision.id,
@@ -148,6 +153,11 @@ def evidence_value(revision: EvidenceRevision) -> EvidenceOut:
         first_observed_at=revision.item.first_observed_at,
         observed_at=revision.observed_at,
         content_hash=revision.content_hash,
+        document=DocumentSummary(
+            **document.model_dump(exclude={"text"}), character_count=len(document.text)
+        )
+        if document
+        else None,
     )
 
 
@@ -187,6 +197,7 @@ def evidence_detail(item_id: UUID, cutoff: datetime | None) -> EvidenceDetail:
         EvidenceRevision.objects.filter(item_id=item_id, observed_at__lte=at)
         .filter(Q(published_at__isnull=True) | Q(published_at__lte=at))
         .select_related("item__source")
+        .defer("raw_document")
         .order_by("-version")
     )
     return EvidenceDetail(
@@ -194,6 +205,24 @@ def evidence_detail(item_id: UUID, cutoff: datetime | None) -> EvidenceDetail:
         revisions=[evidence_value(r) for r in revisions[:100]],
         links=[LinkOut.from_orm(link) for link in links[:100]],
         cutoff=at,
+        document=OfficialDocument.model_validate(current.document) if current.document else None,
+        document_collection=DocumentCollection(
+            state=(
+                "disabled"
+                if not settings.NEWS_FEEDS_ENABLED or not settings.NEWS_DOCUMENTS_ENABLED
+                else "retrying"
+                if current.item.document_error
+                else "available"
+                if current.document
+                else "pending"
+            ),
+            last_checked_at=current.item.document_last_checked_at,
+            last_success_at=current.item.document_last_success_at,
+            next_poll_at=current.item.document_next_poll_at,
+            error=current.item.document_error,
+        )
+        if cutoff is None
+        else None,
     )
 
 

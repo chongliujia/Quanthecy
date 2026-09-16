@@ -28,6 +28,12 @@ services:
     volumes:
       - ./apps/backend:/app/apps/backend
       - ./python:/app/python
+  maintenance-worker:
+    image: quanthecy-backend:dev
+    build: {target: development}
+    volumes:
+      - ./apps/backend:/app/apps/backend
+      - ./python:/app/python
   web:
     image: quanthecy-web:dev
     build: {target: development}

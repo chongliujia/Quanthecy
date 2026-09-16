@@ -8,6 +8,8 @@ from typing import Any
 from django.core.management.base import BaseCommand
 from django.db import close_old_connections
 
+from quanthecy.research.documents import poll_one_document
+from quanthecy.research.events import sync_event_candidates
 from quanthecy.research.news import associate_topics, initialize_sources, poll_one_source
 
 logger = logging.getLogger(__name__)
@@ -34,6 +36,9 @@ class Command(BaseCommand):
                     polled = poll_one_source()
                     if polled or cycles % 6 == 0:
                         associate_topics()
+                    if not stopped.is_set():
+                        poll_one_document()
+                    sync_event_candidates()
                     HEARTBEAT.touch()
                 except Exception:
                     logger.exception("News worker cycle failed")

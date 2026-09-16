@@ -10,7 +10,7 @@ x-python: &python
     DJANGO_SETTINGS_MODULE: config.settings.dev
     DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-quanthecy-local-development-only-do-not-use-in-production}
     DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
-    DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
+    DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-http://localhost:${WEB_PORT:-3000},http://127.0.0.1:${WEB_PORT:-3000}}
     POSTGRES_HOST: postgres
     POSTGRES_DB: ${POSTGRES_DB:-quanthecy}
     POSTGRES_USER: ${POSTGRES_USER:-quanthecy}
@@ -21,6 +21,7 @@ x-python: &python
     CLICKHOUSE_USER: ${CLICKHOUSE_USER:-quanthecy}
     CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-quanthecy-dev-only}
     NEWS_FEEDS_ENABLED: ${NEWS_FEEDS_ENABLED:-true}
+    NEWS_DOCUMENTS_ENABLED: ${NEWS_DOCUMENTS_ENABLED:-true}
     NEWS_PROXY_URL: ${NEWS_PROXY_URL:-}
     AGENT_ENCRYPTION_KEY: ${AGENT_ENCRYPTION_KEY:-}
     AGENT_ALLOWED_ENDPOINTS: ${AGENT_ALLOWED_ENDPOINTS:-}
@@ -116,6 +117,18 @@ services:
     healthcheck:
       test: [CMD, python, -c, 'from pathlib import Path; import time; assert time.time() - Path("/tmp/quanthecy-agent-heartbeat").stat().st_mtime < 45']
       interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+  maintenance-worker:
+    <<: *python
+    command: [python, apps/backend/manage.py, runmaintenanceworker]
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      clickhouse: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, python, -c, 'from pathlib import Path; import time; assert time.time() - Path("/tmp/quanthecy-maintenance-heartbeat").stat().st_mtime < 90']
+      interval: 30s
       timeout: 3s
       retries: 3
       start_period: 20s

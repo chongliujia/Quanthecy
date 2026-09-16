@@ -1,0 +1,69 @@
+{
+  "slug": "fed-october-2026",
+  "name": "Fed · October 2026",
+  "name_zh": "美联储 · 2026 年 10 月",
+  "description": "The October FOMC decision across Polymarket and Kalshi. Each contract retains its own settlement rules and volume units. Collection begins when a target is activated.",
+  "description_zh": "聚焦 Polymarket 与 Kalshi 的十月议息合约。各合约保留独立结算规则与成交量口径，历史数据从启用采集时开始积累。",
+  "targets": [
+    {
+      "platform": "polymarket",
+      "exchange_id": "2589810",
+      "label": "Will the Fed decrease interest rates by 50+ bps after the October 2026 meeting?",
+      "rationale": "October 2026 FOMC decision, verified in the public Gamma API on 2026-09-16. Binary YES outcome. Topic membership does not assert equivalent settlement rules across exchanges."
+    },
+    {
+      "platform": "polymarket",
+      "exchange_id": "2589811",
+      "label": "Will the Fed decrease interest rates by 25 bps after the October 2026 meeting?",
+      "rationale": "October 2026 FOMC decision, verified in the public Gamma API on 2026-09-16. Binary YES outcome. Topic membership does not assert equivalent settlement rules across exchanges."
+    },
+    {
+      "platform": "polymarket",
+      "exchange_id": "2589812",
+      "label": "Will there be no change in Fed interest rates after the October 2026 meeting?",
+      "rationale": "October 2026 FOMC decision, verified in the public Gamma API on 2026-09-16. Binary YES outcome. Topic membership does not assert equivalent settlement rules across exchanges."
+    },
+    {
+      "platform": "polymarket",
+      "exchange_id": "2589813",
+      "label": "Will the Fed increase interest rates by 25 bps after the October 2026 meeting?",
+      "rationale": "October 2026 FOMC decision, verified in the public Gamma API on 2026-09-16. Binary YES outcome. Topic membership does not assert equivalent settlement rules across exchanges."
+    },
+    {
+      "platform": "polymarket",
+      "exchange_id": "2589814",
+      "label": "Will the Fed increase interest rates by 50+ bps after the October 2026 meeting?",
+      "rationale": "October 2026 FOMC decision, verified in the public Gamma API on 2026-09-16. Binary YES outcome. Topic membership does not assert equivalent settlement rules across exchanges."
+    },
+    {
+      "platform": "kalshi",
+      "exchange_id": "KXFEDDECISION-26OCT-H26",
+      "label": "Will the Federal Reserve Hike rates by >25bps at their October 2026 meeting?",
+      "rationale": "October 2026 FOMC decision, verified in the public Kalshi API on 2026-09-16. Binary YES outcome. Topic membership does not assert equivalent settlement rules across exchanges."
+    },
+    {
+      "platform": "kalshi",
+      "exchange_id": "KXFEDDECISION-26OCT-H25",
+      "label": "Will the Federal Reserve Hike rates by 25bps at their October 2026 meeting?",
+      "rationale": "October 2026 FOMC decision, verified in the public Kalshi API on 2026-09-16. Binary YES outcome. Topic membership does not assert equivalent settlement rules across exchanges."
+    },
+    {
+      "platform": "kalshi",
+      "exchange_id": "KXFEDDECISION-26OCT-H0",
+      "label": "Will the Federal Reserve Hike rates by 0bps at their October 2026 meeting?",
+      "rationale": "October 2026 FOMC decision, verified in the public Kalshi API on 2026-09-16. Binary YES outcome. Topic membership does not assert equivalent settlement rules across exchanges."
+    },
+    {
+      "platform": "kalshi",
+      "exchange_id": "KXFEDDECISION-26OCT-C26",
+      "label": "Will the Federal Reserve Cut rates by >25bps at their October 2026 meeting?",
+      "rationale": "October 2026 FOMC decision, verified in the public Kalshi API on 2026-09-16. Binary YES outcome. Topic membership does not assert equivalent settlement rules across exchanges."
+    },
+    {
+      "platform": "kalshi",
+      "exchange_id": "KXFEDDECISION-26OCT-C25",
+      "label": "Will the Federal Reserve Cut rates by 25bps at their October 2026 meeting?",
+      "rationale": "October 2026 FOMC decision, verified in the public Kalshi API on 2026-09-16. Binary YES outcome. Topic membership does not assert equivalent settlement rules across exchanges."
+    }
+  ]
+}

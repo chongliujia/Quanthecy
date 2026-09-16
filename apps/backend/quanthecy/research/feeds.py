@@ -1,4 +1,4 @@
-"""Restricted public-feed adapters. Never fetch arbitrary publisher article URLs."""
+"""Restricted RSS adapters. Official HTML retrieval is separately allowlisted in documents.py."""
 
 import hashlib
 import json

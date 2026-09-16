@@ -21,7 +21,13 @@ def persist_entry(source: EvidenceSource, entry: FeedEntry) -> EvidenceItem:
     item, _ = EvidenceItem.objects.get_or_create(source=source, external_id=entry.external_id)
     item = EvidenceItem.objects.select_for_update().get(pk=item.pk)
     previous = item.revisions.order_by("-version").first()
-    if previous is None or previous.content_hash != entry.content_hash:
+    fields = ("title", "excerpt", "url", "published_at")
+    if previous is None or any(getattr(previous, key) != getattr(entry, key) for key in fields):
+        from .documents import revision_hash
+
+        document = previous.document if previous and previous.url == entry.url else {}
+        raw_document = previous.raw_document if document and previous else ""
+        values = {key: getattr(entry, key) for key in fields}
         EvidenceRevision.objects.create(
             item=item,
             version=previous.version + 1 if previous else 1,
@@ -29,8 +35,14 @@ def persist_entry(source: EvidenceSource, entry: FeedEntry) -> EvidenceItem:
             excerpt=entry.excerpt,
             url=entry.url,
             published_at=entry.published_at,
-            content_hash=entry.content_hash,
+            content_hash=revision_hash({**values, "document": document})
+            if document
+            else entry.content_hash,
+            document=document,
+            raw_document=raw_document,
         )
+        item.document_next_poll_at = timezone.now()
+        item.save(update_fields=["document_next_poll_at"])
     return item
 
 

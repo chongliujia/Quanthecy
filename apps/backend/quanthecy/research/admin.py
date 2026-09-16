@@ -8,6 +8,7 @@ from django.http import HttpRequest
 
 from quanthecy.api.auth import current_user
 from quanthecy.markets.models import Market
+from quanthecy.operations.console import label, tr
 
 from .models import (
     Comparison,
@@ -74,8 +75,29 @@ class EvidenceSourceAdmin(HistoricalAdmin):
 
 @admin.register(EvidenceItem)
 class EvidenceItemAdmin(HistoricalAdmin):
-    list_display = ("id", "source", "first_observed_at")
+    list_display = (
+        "id",
+        "source",
+        "first_observed_at",
+        "document_checked",
+        "document_status",
+    )
     search_fields = ("external_id",)
+    list_filter = ("source", "document_error")
+
+    @admin.display(
+        description=label("Document captured", "正文获取时间"), ordering="document_last_success_at"
+    )
+    def document_checked(self, obj: EvidenceItem) -> Any:
+        return obj.document_last_success_at
+
+    @admin.display(description=label("Document status", "正文采集状态"))
+    def document_status(self, obj: EvidenceItem) -> str:
+        if obj.document_error:
+            return tr("Retrying", "等待重试") + f" · {obj.document_error}"
+        return (
+            tr("Captured", "已采集") if obj.document_last_success_at else tr("Pending", "等待采集")
+        )
 
     def has_add_permission(self, request: HttpRequest) -> bool:
         return False
@@ -83,8 +105,13 @@ class EvidenceItemAdmin(HistoricalAdmin):
 
 @admin.register(EvidenceRevision)
 class EvidenceRevisionAdmin(HistoricalAdmin):
-    list_display = ("title", "version", "published_at", "observed_at")
+    list_display = ("title", "version", "published_at", "observed_at", "has_document")
     search_fields = ("title",)
+    readonly_fields = ("document", "raw_document")
+
+    @admin.display(description=label("Official text", "官方正文"), boolean=True)
+    def has_document(self, obj: EvidenceRevision) -> bool:
+        return bool(obj.document)
 
     def has_add_permission(self, request: HttpRequest) -> bool:
         return False
@@ -103,3 +130,7 @@ class EvidenceLinkAdmin(HistoricalAdmin):
         obj.reviewed_by = current_user(request)
         obj.method = "operator-review-v1"
         obj.save()
+
+
+# Register the event review surfaces after the shared historical admin base.
+from . import event_admin  # noqa: E402, F401

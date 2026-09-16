@@ -4,9 +4,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError, type User, type Organization, type Member } from './api'
 import NavIcon from './NavIcon'
 import CollectionStatus from './CollectionStatus'
+import ThemeSwitch from './ThemeSwitch'
 import { useLayoutPreference } from './terminalLayout'
 import { useRoute, navigate } from './navigation'
 import { ResearchOverview, ComparisonList, ComparisonView, EvidenceList, EvidenceView, SignalFeed } from './ResearchPages'
+const EventPages = lazy(() => import('./EventPages'))
 const ModelSettings = lazy(() => import('./ModelSettings'))
 const MarketExplorer = lazy(() => import('./MarketExplorer'))
 
@@ -54,7 +56,7 @@ function Workspace({ user }: { user: User }) {
   const route = useRoute()
   const [navCollapsed, setNavCollapsed] = useLayoutPreference(`quanthecy.nav.${user.id}`, true, (value): value is boolean => typeof value === 'boolean')
   const cutoff = route.params.get('cutoff') ?? ''
-  const navigation = [['overview', t("Research overview"), '01'], ['markets', t("Market explorer"), '02'], ['signals', t("Signal feed"), '03'], ['comparisons', t("Cross-platform"), '04'], ['evidence', t("News & evidence"), '05'], ['workspace', t("Workspace & members"), '06'], ['model-settings', t("Model settings"), '07']]
+  const navigation = [['overview', t("Research overview"), '01'], ['markets', t("Market explorer"), '02'], ['signals', t("Signal feed"), '03'], ['comparisons', t("Cross-platform"), '04'], ['evidence', t("News & evidence"), '05'], ['events', t('Event dossiers'), '08'], ['workspace', t("Workspace & members"), '06'], ['model-settings', t("Model settings"), '07']]
   const heading = navigation.find(([path]) => path === route.page)?.[1] ?? t("Page not found")
   const organizations = useQuery({ queryKey: ['organizations', user.id], queryFn: () => api<Organization[]>('/organizations?limit=100') })
   const active = organizations.data?.find((org) => org.id === selected) ?? organizations.data?.[0]
@@ -91,6 +93,7 @@ function Workspace({ user }: { user: User }) {
       {route.page === 'overview' && <ResearchOverview userId={user.id} />}
       {route.page === 'markets' && <Suspense fallback={<p role="status">{t("Loading market explorer…")}</p>}><MarketExplorer organization={active} cutoff={cutoff} userId={user.id} selectedId={route.id ?? null} onSelect={(id) => navigate(id ? `/markets/${id}` : '/markets')} /></Suspense>}
       {route.page === 'model-settings' && <Suspense fallback={<p role="status">{t("Loading model settings…")}</p>}><ModelSettings key={active?.id} userId={user.id} organization={active} /></Suspense>}
+      {route.page === 'events' && <Suspense fallback={<p role="status">{t('Loading event research…')}</p>}><EventPages key={`${route.id}-${cutoff}`} userId={user.id} slug={route.id} cutoff={cutoff} /></Suspense>}
       {route.page === 'signals' && <SignalFeed userId={user.id} />}
       {route.page === 'comparisons' && (route.id ? <ComparisonView key={route.id} userId={user.id} id={route.id} cutoff={cutoff} /> : <ComparisonList userId={user.id} cutoff={cutoff} />)}
       {route.page === 'evidence' && (route.id ? <EvidenceView key={route.id} userId={user.id} id={route.id} cutoff={cutoff} /> : <EvidenceList key={cutoff} userId={user.id} cutoff={cutoff} />)}
@@ -115,7 +118,7 @@ export default function App() {
       throw error
     }
   }, retry: false })
-  return <><button className="skip-link" onClick={() => document.getElementById('main-content')?.focus()}>{t("Skip to content")}</button><header className="topbar"><a className="brand" href="#/overview" aria-label={t("Quanthecy home")}><span className="brand-mark">{t("Q")}</span>{t("Quanthecy")}</a>{me.data ? <CollectionStatus userId={me.data.id} /> : <span className="topbar-note">{t("PREDICTION MARKET INTELLIGENCE")}</span>}<div className="language-switch" role="group" aria-label={t("Language / 语言")}><button lang="zh-CN" aria-pressed={language === 'zh'} onClick={() => setLanguage('zh')}>中文</button><button lang="en" aria-pressed={language === 'en'} onClick={() => setLanguage('en')}>{"English"}</button></div></header>
+  return <><button className="skip-link" onClick={() => document.getElementById('main-content')?.focus()}>{t("Skip to content")}</button><header className="topbar"><a className="brand" href="#/overview" aria-label={t("Quanthecy home")}><span className="brand-mark">{t("Q")}</span>{t("Quanthecy")}</a>{me.data ? <CollectionStatus userId={me.data.id} /> : <span className="topbar-note">{t("PREDICTION MARKET INTELLIGENCE")}</span>}<div className="topbar-actions"><ThemeSwitch /><div className="language-switch" role="group" aria-label={t("Language / 语言")}><button lang="zh-CN" aria-pressed={language === 'zh'} onClick={() => setLanguage('zh')}>中文</button><button lang="en" aria-pressed={language === 'en'} onClick={() => setLanguage('en')}>{"English"}</button></div></div></header>
     {me.isPending ? <p className="page-message" role="status">{t("Loading your workspace…")}</p>
       : me.error ? <div className="page-message" role="alert"><h1>{t("Unable to reach your workspace")}</h1><p>{t(me.error.message)}</p><button className="primary" onClick={() => void me.refetch()}>{t("Try again")}</button></div>
         : me.data ? <Workspace user={me.data} /> : <AuthForm />}

@@ -13,6 +13,8 @@ import { age } from './collectionHealth'
 import type { ChartViewport } from './ProbabilityChart'
 import { signalValue } from './signalValue'
 import AgentPanel from './AgentPanel'
+import { MarketEventLinks } from './EventPages'
+import DataQuality from './DataQuality'
 const ProbabilityChart = lazy(() => import('./ProbabilityChart'))
 
 function Skeleton({ text }: { text: string }) { return <div className="terminal-skeleton" role="status"><span /><span /><span /><p>{text}</p></div> }
@@ -86,6 +88,7 @@ export default function MarketWorkbench({ id, userId, organization, close, cutof
     {market && <>
       <header className="terminal-market-header"><div className="exchange-avatar">{market.platform === 'kalshi' ? t("K") : t("P")}</div><div className="terminal-title"><div><span className="exchange-label">{market.platform}</span><span className="terminal-tag">{t(market.status)}</span><span className="terminal-tag">{t("YES")}</span></div><h2>{market.title}</h2><small>{market.exchange_id}</small></div><button className="time-toggle" aria-expanded={showTime} onClick={() => setShowTime(!showTime)}>◷ {cutoff ? t("Historical cutoff") : t("Time context")}</button></header>
       {showTime && <ResearchTime key={cutoff} cutoff={cutoff} path={`/markets/${id}`} />}
+      <DataQuality quality={market.data_quality} /><MarketEventLinks userId={userId} marketId={id} cutoff={evidenceCutoff} />
       <div className="quote-strip"><Metric label={t("YES PROBABILITY")} value={market.probability == null ? '—' : probability(market.probability)} detail={t("Bid / ask midpoint")} tone={market.probability == null || market.stale || cutoff ? '' : "positive quote-flash"} /><Metric label={t("15M CHANGE")} value={market.metrics.probability_change_15m == null ? '—' : change(market.metrics.probability_change_15m)} detail={t("Percentage points")} tone={market.metrics.probability_change_15m == null || market.stale ? '' : market.metrics.probability_change_15m < 0 ? 'negative' : 'positive'} /><Metric label={t("BEST BID / ASK")} value={`${market.best_bid == null ? '—' : probability(market.best_bid)} / ${market.best_ask == null ? '—' : probability(market.best_ask)}`} detail={t("Observed quote")} /><Metric label={t("VOLUME Z-SCORE")} value={market.metrics.volume_zscore?.toFixed(2) ?? '—'} detail={t("Sampled volume-rate z-score")} /></div>
       {market.stale && <div className="terminal-notice stale-notice" role="status"><strong>{t("Collection is stale ·")} {age(Math.max(0, Math.floor(((cutoff ? Date.parse(cutoff) : Date.now()) - Date.parse(market.last_observed_at)) / 1000)))}</strong><span>{t("Last observed")} {time(market.last_observed_at)}{t(". Quotes and changes refer to that observation.")}</span>{!cutoff && <a href={lastWindowLink}>{t("View last collected window →")}</a>}</div>}
       {!market.metrics.history_ready && <p className="terminal-notice analytics-notice">{t("Analytics pending:")} {market.metrics.reason?.replaceAll('_', ' ') ?? t("insufficient history")}. {market.stale ? t("New observations are needed before analytics can resume.") : t("A continuous 15-minute window is required.")}</p>}

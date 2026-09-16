@@ -23,6 +23,7 @@ export function ExpertTeam({ skills, run, claim }: { skills: ResearchSkill[]; ru
             {!!output.challenges.length && <><h4>{t('Challenges')}</h4>{output.challenges.map(claim)}</>}
             <h4>{t('Research limitations')}</h4><ul>{output.limitations.map((item, i) => <li key={i}>{item}</li>)}</ul>
             <h4>{t('Next observations')}</h4><ul>{output.watch_for.map((item, i) => <li key={i}>{item}</li>)}</ul></>}
+          {step?.format_adjustments?.map(adjustment => <p className="format-note" key={adjustment.field}>{t('Local formatting: {field}, {before} items arranged into {after} groups. All original text retained; no extra model request.', { field: t(['limitations', 'risk_flags'].includes(adjustment.field) ? 'Research limitations' : 'Next observations'), before: adjustment.original_count, after: adjustment.grouped_count })}</p>)}
           {step?.error_code && (step.error_code === 'invalid_report' ? <ValidationNotice issues={step.validation_errors} /> : <p className="error">{runError(step.error_code)}</p>)}
           {step && <details className="step-context"><summary>{t('Context manifest')} · {step.input_manifest.reference_ids.length} {t('references')}</summary>
             <p>{t('Scoped evidence; validated peer findings only. Raw observation history is not sent to the model.')}</p>

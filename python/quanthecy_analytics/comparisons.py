@@ -3,9 +3,11 @@
 from datetime import UTC, datetime
 from typing import Any
 
+from .quality import BAD_FLAGS, quote_reasons
+
 MAX_AGE_SECONDS = 180
 MAX_SKEW_SECONDS = 90
-EXCLUDED_FLAGS = {"STALE", "GAP", "OUT_OF_ORDER", "CROSSED_BOOK", "PARTIAL"}
+EXCLUDED_FLAGS = BAD_FLAGS | {"PARTIAL"}
 
 
 def timestamp(value: str) -> datetime:
@@ -55,6 +57,8 @@ def compare(
             issues.append(f"{prefix}_STALE")
         if probability is None:
             issues.append(f"{prefix}_NO_PRICE")
+        elif probability["basis"] == "MIDPOINT" and quote_reasons(row):
+            issues.append(f"{prefix}_INVALID_QUOTE")
         if row["market"]["status"] != "OPEN":
             issues.append(f"{prefix}_CLOSED")
         if EXCLUDED_FLAGS.intersection(row["quality_flags"]):

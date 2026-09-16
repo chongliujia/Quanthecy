@@ -28,6 +28,6 @@ export function EvidenceCard({ item, cutoff = '', compact = false }: { item: Evi
   return <article className="evidence-card"><div className="evidence-meta"><span>{item.source_name}</span><span>{t("Published")} {time(item.published_at)}</span></div>
     <h3><a href={`#${withCutoff(`/evidence/${item.id}`, cutoff)}`}>{item.title}</a></h3>
     {!compact && item.excerpt !== item.title && <p>{item.excerpt}</p>}
-    <div className="evidence-footer"><span>{t("First observed")} {time(item.first_observed_at)} {t("· v")}{item.version}</span><a href={item.url} target="_blank" rel="noopener noreferrer">{t("Official source ↗")}</a></div>
+    <div className="evidence-footer"><span>{t("First observed")} {time(item.first_observed_at)} {t("· v")}{item.version} · {item.document ? t('Text captured') : t('Feed excerpt only')}</span><a href={item.url} target="_blank" rel="noopener noreferrer">{t("Official source ↗")}</a></div>
   </article>
 }

@@ -3,11 +3,17 @@ export type Metrics = {
   probability_change_15m: number | null; spread_change_15m: number | null;
   volume_zscore: number | null; window_end?: string | null;
 }
+export type ResearchQuality = {
+  version: string; checked_at: string; state: 'ready' | 'limited' | 'blocked';
+  price_usable: boolean; volume_usable: boolean; reasons: string[]; limitations: string[];
+  age_seconds: number | null;
+}
 export type Market = {
   id: string; platform: string; exchange_id: string; title: string; status: string;
   probability: number | null; best_bid: number | null; best_ask: number | null;
   first_observed_at: string; last_observed_at: string; stale: boolean;
   quality_flags: string[]; metrics: Metrics;
+  data_quality?: ResearchQuality;
 }
 export type Observation = {
   observation_id: string; received_at: string; quality_flags: string[];

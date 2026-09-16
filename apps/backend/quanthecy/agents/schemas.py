@@ -8,10 +8,11 @@ from quanthecy_analytics.agent import ResearchReport
 from quanthecy_analytics.intelligence import (
     IntelligenceReport,
     Language,
+    RiskReviewOutput,
     SpecialistOutput,
     Workflow,
 )
-from quanthecy_analytics.report_validation import ValidationIssue
+from quanthecy_analytics.report_validation import ListGrouping, ValidationIssue
 
 from quanthecy.api.schemas import InputSchema
 
@@ -25,7 +26,7 @@ class ConfigurationInput(InputSchema):
     clear_api_key: bool = False
     enabled: bool
     daily_run_limit: int = Field(ge=1, le=100)
-    max_output_tokens: int = Field(ge=256, le=8000)
+    max_output_tokens: int = Field(ge=256, le=65536)
 
 
 class ConfigurationOut(Schema):
@@ -39,6 +40,7 @@ class ConfigurationOut(Schema):
     daily_run_limit: int
     max_output_tokens: int
     allowed_endpoints: list[str]
+    max_output_tokens_limit: int = 65536
 
 
 class AgentStatus(Schema):
@@ -90,10 +92,11 @@ class StageOut(Schema):
     state: str
     started_at: datetime
     finished_at: datetime | None
-    output: SpecialistOutput | IntelligenceReport | None
+    output: RiskReviewOutput | SpecialistOutput | IntelligenceReport | None
     usage: dict[str, int]
     error_code: str
     validation_errors: list[ValidationIssue] = Field(default_factory=list)
+    format_adjustments: list[ListGrouping] = Field(default_factory=list)
     input_manifest: StageManifest
 
 

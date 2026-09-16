@@ -6,6 +6,7 @@ from quanthecy_analytics.intelligence import (
     SKILLS,
     Forecast,
     digest,
+    instructions,
     scoped_context,
     stage_input,
     validate_stage,
@@ -104,6 +105,41 @@ def test_schema_length_and_reference_contract_match_actual_validator(context):
     assert validation_issues(error.value) == [{"field": "summary.text", "code": "too_long"}]
 
 
+@pytest.mark.parametrize("skill", SKILLS[:4], ids=lambda skill: skill.id)
+def test_role_list_limits_agree_in_prompt_schema_and_validator(context, skill):
+    peers = {key: specialist() for key in skill.dependencies}
+    packet = stage_input(context, skill, peers)
+    maximum = 12
+    assert packet["output_limits"]["limitations"] == maximum
+    assert packet["output_schema"]["properties"]["limitations"]["maxItems"] == maximum
+    assert json.dumps(packet["output_limits"], sort_keys=True) in instructions(skill, "zh")
+    output = specialist()
+    output["limitations"] = [f"Distinct evidence gap {i}." for i in range(maximum)]
+    assert validate_stage(json.dumps(output), skill, context) == output
+    output["limitations"].append("One additional gap.")
+    adjustments = []
+    result = validate_stage(json.dumps(output), skill, context, adjustments=adjustments)
+    assert len(result["limitations"]) == maximum
+    assert all(item in "\n".join(result["limitations"]) for item in output["limitations"])
+    assert adjustments[0].model_dump() == {
+        "field": "limitations",
+        "original_count": 13,
+        "grouped_count": 12,
+        "method": "consecutive_text_grouping_v1",
+    }
+
+
+def test_expanded_risk_limit_keeps_citation_and_total_memory_checks(context):
+    output = specialist("unknown-source")
+    output["limitations"] = [f"Distinct gap {i}." for i in range(12)]
+    with pytest.raises(ValueError, match="unknown_reference"):
+        validate_stage(json.dumps(output), SKILLS[3], context)
+    output["summary"] = claim()
+    output["limitations"] = ["字" * 600 for _ in range(12)]
+    with pytest.raises(ValueError, match="output_size"):
+        validate_stage(json.dumps(output), SKILLS[3], context)
+
+
 def test_equivalent_unicode_json_whitespace_and_fences_do_not_change_memory_budget(context):
     output = specialist()
     output["summary"]["text"] = "测试" * 300
@@ -190,3 +226,76 @@ def test_abstention_is_not_zero_probability_and_forecast_requires_event_evidence
     bad["disagreements"] = [claim("invented")]
     with pytest.raises(ValueError, match="unknown_reference"):
         validate_stage(json.dumps(bad), SKILLS[-1], context)
+
+
+def test_v5_estimate_must_cite_a_directly_reviewed_version(context):
+    context["version"] = "context-v5"
+    context["quality"] = {"forecast_eligible": True, "reviewed_evidence_ids": ["another-version"]}
+    with pytest.raises(ValueError):
+        validate_stage(json.dumps(report("ESTIMATE")), SKILLS[-1], context)
+    context["quality"]["reviewed_evidence_ids"] = ["news"]
+    assert (
+        validate_stage(json.dumps(report("ESTIMATE")), SKILLS[-1], context)["forecast"]["status"]
+        == "ESTIMATE"
+    )
+    context["quality"]["forecast_eligible"] = False
+    with pytest.raises(ValueError):
+        validate_stage(json.dumps(report("ESTIMATE")), SKILLS[-1], context)
+
+
+@pytest.mark.parametrize("count", [13, 36, 64])
+def test_text_grouping_retains_order_unicode_qualifications_and_reports_it(context, count):
+    output = specialist()
+    original = [f" [第{i:03d}项] 必须保留的限制。\n• 原始说明与限定条件。 " for i in range(count)]
+    output["limitations"] = original
+    adjustments = []
+    result = validate_stage(json.dumps(output), SKILLS[1], context, adjustments=adjustments)
+    combined = "\n".join(result["limitations"])
+    positions = [combined.index(item) for item in original]
+    assert positions == sorted(positions) and len(set(positions)) == count
+    assert all(combined.count(item) == 1 for item in original)
+    assert len(result["limitations"]) == 12
+    assert all(len(item) <= 600 for item in result["limitations"])
+    assert adjustments[0].original_count == count
+
+
+@pytest.mark.parametrize("items", [[str(i) for i in range(65)], ["x" * 600 for _ in range(13)]])
+def test_unrepairable_count_overflow_is_rejected_without_losing_caveats(context, items):
+    output = specialist()
+    output["limitations"] = items
+    adjustments = []
+    with pytest.raises(ValueError) as error:
+        validate_stage(json.dumps(output), SKILLS[1], context, adjustments=adjustments)
+    assert validation_issues(error.value) == [{"field": "limitations", "code": "too_many"}]
+    assert not adjustments
+
+
+@pytest.mark.parametrize("problem", ["unknown_reference", "invalid_shape", "claim_overflow"])
+def test_grouping_never_bypasses_other_validation(context, problem):
+    output = specialist()
+    output["limitations"] = [f"Gap {i}." for i in range(13)]
+    if problem == "unknown_reference":
+        output["summary"]["references"] = ["invented-source"]
+    elif problem == "invalid_shape":
+        output["limitations"][3] = {"text": "Not a string"}
+    else:
+        output["findings"] = [claim() for _ in range(5)]
+    adjustments = []
+    with pytest.raises(ValueError):
+        validate_stage(json.dumps(output), SKILLS[1], context, adjustments=adjustments)
+    assert adjustments == []
+
+
+def test_synthesis_groups_risks_and_followups_but_preserves_forecast_gates(context):
+    output = report()
+    output["risk_flags"] = [f"Risk [{i:03d}] must survive." for i in range(18)]
+    output["follow_up"] = [f"Observation [{i:03d}] must survive." for i in range(10)]
+    adjustments = []
+    result = validate_stage(json.dumps(output), SKILLS[-1], context, adjustments=adjustments)
+    assert len(result["risk_flags"]) == 12 and len(result["follow_up"]) == 8
+    for field in ("risk_flags", "follow_up"):
+        assert all(item in "\n".join(result[field]) for item in output[field])
+    assert [item.field for item in adjustments] == ["risk_flags", "follow_up"]
+    output["forecast"] = forecast("ESTIMATE")
+    with pytest.raises(ValueError, match="forecast_not_supported"):
+        validate_stage(json.dumps(output), SKILLS[-1], context)

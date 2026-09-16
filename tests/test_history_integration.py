@@ -2,8 +2,10 @@
 
 import json
 import os
-from datetime import UTC, datetime
+import time
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
@@ -27,8 +29,8 @@ def repository():
     admin = ClickHouseRepository(
         url=os.environ["QUANTHECY_TEST_CLICKHOUSE_URL"],
         database="default",
-        user="quanthecy",
-        password="quanthecy-dev-only",
+        user=os.environ.get("QUANTHECY_TEST_CLICKHOUSE_USER", "quanthecy"),
+        password=os.environ.get("QUANTHECY_TEST_CLICKHOUSE_PASSWORD", "quanthecy-dev-only"),
     )
     admin.execute(f"CREATE DATABASE {database}")
     repo = ClickHouseRepository(
@@ -130,3 +132,93 @@ def test_recent_signal_feed_filters_source_type_and_time(repository):
     assert repository.recent_signals(platform="kalshi", signal_type=None, limit=100) == []
     selected = repository.recent_signals(platform=None, signal_type="PROBABILITY_SPIKE", limit=1)
     assert len(selected) == 1 and selected[0]["signal_type"] == "PROBABILITY_SPIKE"
+
+
+def test_raw_cleanup_preserves_envelopes_signals_and_next_batch(repository):
+    from django.utils import timezone
+    from quanthecy.accounts.models import User
+    from quanthecy.operations.models import RawPayloadDeletion
+    from quanthecy.operations.raw_data import enqueue_deletion, preview_deletion, process_deletion
+    from quanthecy_analytics.signals import analyze
+    from quanthecy_analytics.storage.raw import RawDataRepository, RawScope, RawWindow
+
+    observations = json.loads((Path(__file__).parent / "fixtures/research-window.json").read_text())
+    collector = uuid4()
+    for batch_id, batch in enumerate([observations[:6], observations[6:12], observations[12:]], 1):
+        records = [
+            {
+                "collector_id": str(collector),
+                "batch_id": batch_id,
+                "observation_id": row["observation_id"],
+                "platform": row["platform"],
+                "market_id": row["market"]["id"],
+                "outcome_id": row["outcome"]["id"],
+                "received_at": row["received_at"],
+                "envelope": json.dumps(row),
+                "raw_payload": json.dumps({"exchange_field": "original", "batch": batch_id}),
+            }
+            for row in batch
+        ]
+        repository.execute(
+            "INSERT INTO market_observations SETTINGS date_time_input_format='best_effort' "
+            "FORMAT JSONEachRow\n" + "\n".join(json.dumps(row) for row in records)
+        )
+        repository.execute(
+            "INSERT INTO ingestion_batches SETTINGS date_time_input_format='best_effort' "
+            "FORMAT JSONEachRow\n"
+            + json.dumps(
+                {
+                    "collector_id": str(collector),
+                    "batch_id": batch_id,
+                    "row_count": len(batch),
+                    "committed_at": batch[-1]["received_at"],
+                }
+            )
+        )
+    assert process_batch(repository, collector)
+    assert process_batch(repository, collector)
+    market = Market.objects.get()
+    raw = RawDataRepository(repository)
+    window = RawWindow(
+        platform="polymarket",
+        market_id=market.pk,
+        start=observations[0]["received_at"],
+        end=datetime.fromisoformat(observations[-1]["received_at"]) + timedelta(seconds=1),
+    )
+    assert len(raw.observations(window)) == 16
+    first_id = observations[0]["observation_id"]
+    assert raw.observation(market.pk, first_id)["raw_payload"]
+    operator = User.objects.create_superuser("cleanup@example.com", "test-password")
+    with patch("quanthecy.operations.raw_data.repository", return_value=raw):
+        summary, token = preview_deletion(operator, window)
+    assert summary == {"observations": 16, "eligible": 6, "protected": 10, "cleared": 0}
+    job = enqueue_deletion(operator, token, "Integration cleanup")
+    scope = RawScope.model_validate(job.scope)
+    assert process_deletion(raw)
+    # Mutation commands must retain the operation UUID for uncertain-submit recovery.
+    assert raw.mutation_status(job.pk)
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        RawPayloadDeletion.objects.filter(pk=job.pk).update(
+            lease_expires_at=timezone.now() - timedelta(seconds=1)
+        )
+        process_deletion(raw)
+        job.refresh_from_db()
+        if job.state != "RUNNING":
+            break
+        time.sleep(0.1)
+    assert job.state == "SUCCEEDED", (job.error_code, raw.mutation_status(job.pk))
+    assert raw.summary(scope) == {"observations": 16, "eligible": 0, "protected": 10, "cleared": 6}
+    detail = raw.observation(market.pk, first_id)
+    assert detail["raw_payload"] == ""
+    assert json.loads(detail["envelope"]) == observations[0]
+    assert repository.batch(collector, 1) == observations[:6]
+    assert process_batch(repository, collector)  # Batch 3 still advances normally after clearing.
+    assert not process_batch(repository, collector)
+    market.refresh_from_db()
+    assert market.metrics == analyze(observations)[0]
+    for signal in repository.signals(market.pk):
+        assert signal in analyze(repository.signal_inputs(signal))[1]
+    # A replay of the same frozen deletion cannot expand to the newly reconciled batch.
+    raw.submit_deletion(job.pk, scope)
+    assert raw.summary(scope)["protected"] == 10

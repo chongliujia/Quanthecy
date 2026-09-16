@@ -22,7 +22,7 @@ from quanthecy_analytics.intelligence import (
     stage_input,
     validate_stage,
 )
-from quanthecy_analytics.report_validation import validation_issues
+from quanthecy_analytics.report_validation import ListGrouping, validation_issues
 
 from quanthecy.organizations.models import Organization
 from quanthecy.organizations.policies import require_org_role
@@ -42,7 +42,7 @@ def bounded_complete(
     child = context.Process(target=child_complete, args=(writer, connection, system, prompt))
     child.start()
     writer.close()
-    deadline = time.monotonic() + 60
+    deadline = time.monotonic() + connection.deadline_seconds
     try:
         while time.monotonic() < deadline and not stopped.is_set():
             if reader.poll(0.2):
@@ -159,6 +159,7 @@ def process_one(
                     "usage": {},
                     "error_code": "",
                     "validation_errors": [],
+                    "format_adjustments": [],
                     "input_manifest": {
                         "cutoff": context["cutoff"],
                         "context_sha256": digest(packet),
@@ -175,7 +176,7 @@ def process_one(
                     steps=steps,
                     stage=skill.id,
                     usage=usage,
-                    lease_expires_at=timezone.now() + timedelta(minutes=3),
+                    lease_expires_at=timezone.now() + timedelta(seconds=connection.lease_seconds),
                 ):
                     return True
                 phase = "provider"
@@ -190,9 +191,13 @@ def process_one(
                     return True
                 connection_for(run)
                 phase = "validation"
-                output = validate_stage(raw, skill, packet["context"])
+                adjustments: list[ListGrouping] = []
+                output = validate_stage(raw, skill, packet["context"], adjustments=adjustments)
                 step.update(
-                    state="SUCCEEDED", output=output, finished_at=timezone.now().isoformat()
+                    state="SUCCEEDED",
+                    output=output,
+                    finished_at=timezone.now().isoformat(),
+                    format_adjustments=[item.model_dump() for item in adjustments],
                 )
                 if not live_run(run).update(steps=steps, usage=usage):
                     return True
@@ -204,6 +209,10 @@ def process_one(
             return True
         # Recheck the settings/role immediately before the only external request.
         connection = connection_for(run)
+        if not live_run(run).update(
+            lease_expires_at=timezone.now() + timedelta(seconds=connection.lease_seconds)
+        ):
+            return True
         phase = "provider"
         raw, usage = complete(connection, system, prompt, stopped)
         AgentRun.objects.filter(pk=run.pk, lease_token=run.lease_token).update(usage=usage)

@@ -42,6 +42,23 @@ class Connection:
     api_key: str = field(repr=False)
     max_output_tokens: int = 2000
 
+    @property
+    def timeout_seconds(self) -> int:
+        return 300 if self.max_output_tokens > 8000 else 40
+
+    @property
+    def deadline_seconds(self) -> int:
+        return self.timeout_seconds + 20
+
+    @property
+    def lease_seconds(self) -> int:
+        return max(180, self.deadline_seconds + 60)
+
+    @property
+    def max_response_bytes(self) -> int:
+        # Includes provider reasoning and JSON-escaped Unicode, not just report text.
+        return min(8 * 1024 * 1024, max(131072, self.max_output_tokens * 96 + 65536))
+
 
 def complete(connection: Connection, system: str, prompt: str) -> tuple[str, dict[str, int]]:
     token_field = "max_completion_tokens" if connection.provider == "openai" else "max_tokens"
@@ -76,9 +93,11 @@ def complete(connection: Connection, system: str, prompt: str) -> tuple[str, dic
         method="POST",
     )
     try:
-        with build_opener(NoRedirect()).open(request, timeout=40) as response:
-            raw = response.read(131073)
-        if len(raw) > 131072:
+        with build_opener(NoRedirect()).open(
+            request, timeout=connection.timeout_seconds
+        ) as response:
+            raw = response.read(connection.max_response_bytes + 1)
+        if len(raw) > connection.max_response_bytes:
             raise ProviderFailure("provider_failed")
         result = json.loads(raw)
         usage = result.get("usage") or {}
@@ -106,7 +125,7 @@ def complete(connection: Connection, system: str, prompt: str) -> tuple[str, dic
                 raise ProviderFailure("provider_output_limit")
             if choice.get("finish_reason") != "stop":
                 raise ProviderFailure("provider_invalid_response")
-        if not isinstance(text, str) or len(text) > 48000:
+        if not isinstance(text, str) or len(text) > 262144:
             raise ProviderFailure("provider_failed")
         counts = {
             key: value

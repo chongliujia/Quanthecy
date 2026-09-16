@@ -7,6 +7,8 @@ import { Empty, ErrorNotice, EvidenceCard, ResearchTime } from './ResearchUI'
 import { change, probability, readable, time } from './format'
 import type { Comparison, Evidence, EvidenceDetail, FeedSignal, Overview, Quote, Review, Timeline } from './researchTypes'
 
+import OfficialDocumentPanel from './OfficialDocumentPanel'
+
 const ComparisonChart = lazy(() => import('./ComparisonChart'))
 
 function PairCard({ review, cutoff = '' }: { review: Review; cutoff?: string }) {
@@ -36,7 +38,7 @@ export function ResearchOverview({ userId }: { userId: string }) {
     </section><section className="panel source-panel"><span className="eyebrow">{t("COLLECTION STATUS")}</span><h2>{t("Know your coverage")}</h2><p>{t("Official Fed feeds provide a focused starting point. Publication dates can precede collection.")}</p>
       {overview.data?.news_polling_enabled === false && <p className="data-warning">{t("News polling is paused.")}</p>}
       {overview.data?.sources.map((source) => <article key={source.slug}><a href={source.url} target="_blank" rel="noopener noreferrer">{source.name} ↗</a><small>{t("Last success:")} {time(source.last_success_at)}</small><small>{t("Last check:")} {time(source.last_checked_at)}</small>{source.error && <p className="error">{source.error}</p>}</article>)}
-      <p className="quiet">{t("REST market snapshots · No history before collection · Feed excerpts with original links")}</p>
+      <p className="quiet">{t("REST market snapshots · History from collection · Versioned official evidence")}</p>
     </section></div>
   </>
 }
@@ -88,7 +90,7 @@ export function EvidenceList({ userId, cutoff }: { userId: string; cutoff: strin
   function submit(event: FormEvent) { event.preventDefault(); setSearch(draft); setOffset(0) }
   return <><p className="page-description">{t("Federal Reserve announcements and speeches, with publication dates and a record of when each version entered the research platform.")}</p><ResearchTime key={cutoff} cutoff={cutoff} path="/evidence" />
     <div className="market-controls"><form onSubmit={submit}><label className="sr-only" htmlFor="news-search">{t("Search announcements")}</label><input id="news-search" placeholder={t("Search official announcements")} value={draft} maxLength={200} onChange={(e) => setDraft(e.target.value)} /><button>{t("Search")}</button></form><label>{t("Source")}<select value={source} onChange={(e) => { setSource(e.target.value); setOffset(0) }}><option value="">{t("All Fed feeds")}</option><option value="fed-monetary">{t("Monetary policy")}</option><option value="fed-speeches">{t("Speeches")}</option></select></label></div>
-    <p className="coverage-note">{t("Official feed excerpts only. First observed is when Quanthecy collected the entry, even if its publication date is older. Topic matches do not establish causation.")}</p>
+    <p className="coverage-note">{t("Official feed entries with captured document text where available. Publication, collection and document versions remain separate. Topic matches do not establish causation.")}</p>
     {query.isPending && <p role="status">{t("Loading evidence…")}</p>}{query.error && <ErrorNotice error={query.error} retry={() => void query.refetch()} />}
     {query.data && (query.data.items.length ? <><section className="panel evidence-list">{query.data.items.map((item) => <EvidenceCard key={item.id} item={item} cutoff={cutoff} />)}</section><div className="pagination"><button disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - 20))}>{t("Previous")}</button><span>{offset + 1}–{Math.min(offset + 20, query.data.total)} {t("of")} {query.data.total}</span><button disabled={offset + 20 >= query.data.total} onClick={() => setOffset(offset + 20)}>{t("Next")}</button></div></> : <Empty title={t("No evidence available for this view")}>{t("Try another filter or a later cutoff. Older publication dates do not imply that Quanthecy had collected those entries at the time.")}</Empty>)}
   </>
@@ -98,7 +100,8 @@ export function EvidenceView({ userId, id, cutoff }: { userId: string; id: strin
   const query = useQuery({ queryKey: ['evidence-item', userId, id, cutoff], queryFn: () => api<EvidenceDetail>(withCutoff(`/evidence/${encodeURIComponent(id)}`, cutoff)), refetchInterval: cutoff ? false : 60000 })
   return <><a className="text-button" href={`#${withCutoff('/evidence', cutoff)}`}>{t("← All evidence")}</a><ResearchTime key={cutoff} cutoff={cutoff} path={`/evidence/${id}`} />
     {query.isPending && <p role="status">{t("Loading evidence record…")}</p>}{query.error && <ErrorNotice error={query.error} retry={() => void query.refetch()} />}
-    {query.data && <><section className="panel evidence-detail"><EvidenceCard item={query.data.item} cutoff={cutoff} /><p className="quiet">{t("This version was observed")} {time(query.data.item.observed_at)}{t(". The publisher's publication date is stored separately.")}</p><details><summary>{t("Stored versions (")}{query.data.revisions.length})</summary>{query.data.revisions.map((r) => <article className="revision" key={r.revision_id}><strong>{t("v")}{r.version} · {r.title}</strong><p>{t("Published")} {time(r.published_at)} {t("· Observed")} {time(r.observed_at)}</p><p>{r.excerpt}</p><small className="audit-ids">{t("Content SHA-256:")} {r.content_hash}</small></article>)}</details></section>
+    {query.data && <><section className="panel evidence-detail"><EvidenceCard item={query.data.item} cutoff={cutoff} /><p className="quiet">{t("This version was observed")} {time(query.data.item.observed_at)}{t(". The publisher's publication date is stored separately.")}</p><details><summary>{t("Stored versions (")}{query.data.revisions.length})</summary>{query.data.revisions.map((r) => <article className="revision" key={r.revision_id}><strong>{t("v")}{r.version} · {r.title}</strong><p>{t("Published")} {time(r.published_at)} {t("· Observed")} {time(r.observed_at)}</p><p>{r.excerpt}</p><small className="audit-ids">{t("Content SHA-256:")} {r.content_hash}</small><p><a href={`#${withCutoff(`/evidence/${id}`, r.observed_at)}`}>{t("View this saved version →")}</a> · {r.document ? t("Text captured") : t("Feed excerpt only")}</p></article>)}</details></section>
+      <OfficialDocumentPanel key={`${id}:${query.data.item.revision_id}`} document={query.data.document} collection={query.data.document_collection} historical={Boolean(cutoff)} />
       <section className="panel rules"><h3>{t("Market associations")}</h3><p>{t("Relevance is separate from causation. Automatic matches need further research.")}</p>{query.data.links.length === 0 && <p>{t("No market associations known at this cutoff.")}</p>}{query.data.links.map((link) => <article className="signal-row" key={link.id}><div><span className={`badge ${link.status === 'TOPIC_ONLY' ? 'badge-amber' : ''}`}>{readable(link.status)}</span><p>{link.rationale}</p><small>{time(link.created_at)} · {link.method}</small></div><a href={`#/markets/${link.market_id}`}>{t("Latest market view →")}</a></article>)}</section>
     </>}
   </>

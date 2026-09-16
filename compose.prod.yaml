@@ -22,6 +22,9 @@ services:
   news-worker:
     environment: *production-env
     restart: unless-stopped
+  maintenance-worker:
+    environment: *production-env
+    restart: unless-stopped
   web:
     ports: !reset []
     restart: unless-stopped

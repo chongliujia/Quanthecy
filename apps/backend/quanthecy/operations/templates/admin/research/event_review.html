@@ -1,0 +1,21 @@
+{% extends "admin/change_form.html" %}
+{% block after_field_sets %}
+{{ block.super }}
+{% if review_candidate %}
+<fieldset class="module aligned">
+  <h2>{% if console_is_zh %}核对事件范围与原文{% else %}Event scope and original text{% endif %}</h2>
+  <div style="padding:20px;max-width:100ch">
+    {% if not review_preview_bound %}<p><a href="{{ review_preview_url }}">{% if console_is_zh %}打开此版本的审核表单 →{% else %}Open the review form for this version →{% endif %}</a></p>{% endif %}
+    <h3>{{ review_candidate.definition.title }}</h3>
+    <p>{{ review_candidate.definition.scope }}</p>
+    {% if console_is_zh %}<p>{{ review_candidate.definition.scope_zh }}</p>{% endif %}
+    <p>{% if console_is_zh %}“直接相关”仅表示与事件有关，不表示支持任何合约结果，也不证明价格变化原因。请选择原文段落，并说明其适用范围与局限。{% else %}Direct relevance does not support a contract outcome or prove a cause of price changes. Cite original paragraphs and explain relevance and limitations.{% endif %}</p>
+    <h3>{{ review_candidate.revision.title }} · v{{ review_candidate.revision.version }}</h3>
+    <a href="{{ review_candidate.revision.url }}" target="_blank" rel="noopener noreferrer">{% if console_is_zh %}官方来源 ↗{% else %}Official source ↗{% endif %}</a>
+    {% for paragraph in review_paragraphs %}<p><strong>[{{ forloop.counter }}]</strong> {{ paragraph }}</p>{% empty %}<p>{{ review_candidate.revision.excerpt }}</p>{% endfor %}
+  </div>
+</fieldset>
+{% else %}
+<p><a href="{% url 'admin:research_eventevidence_changelist' %}?review_state=pending">{% if console_is_zh %}从待审核队列选择资料并打开原文 →{% else %}Choose a candidate and open its original text →{% endif %}</a></p>
+{% endif %}
+{% endblock %}

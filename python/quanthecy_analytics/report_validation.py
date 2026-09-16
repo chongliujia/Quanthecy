@@ -29,6 +29,70 @@ class ValidationIssue(BaseModel):
     code: IssueCode
 
 
+class ListGrouping(BaseModel):
+    """Audit metadata only; no provider text is included here."""
+
+    model_config = ConfigDict(extra="forbid")
+    field: Literal["limitations", "watch_for", "risk_flags", "follow_up"]
+    original_count: int
+    grouped_count: int
+    method: Literal["consecutive_text_grouping_v1"] = "consecutive_text_grouping_v1"
+
+
+def group_narrative_lists(value: dict[str, Any], schema: dict[str, Any]) -> list[ListGrouping]:
+    """Group consecutive text items without deletion, rewriting, deduplication or retries.
+
+    Only these narrative fields are eligible. Citations, claims, enums and forecast
+    fields are never repaired. Invalid/oversized strings still fail validation.
+    The schema and existing whole-result memory budget remain authoritative.
+    """
+    changes = []
+    for name in ("limitations", "watch_for", "risk_flags", "follow_up"):
+        field = schema.get("properties", {}).get(name, {})
+        maximum = field.get("maxItems")
+        text_limit = field.get("items", {}).get("maxLength")
+        items = value.get(name)
+        if (
+            not isinstance(maximum, int)
+            or maximum < 1
+            or not isinstance(text_limit, int)
+            or not isinstance(items, list)
+            or not maximum < len(items) <= 64
+            or any(not isinstance(item, str) or not 1 <= len(item) <= text_limit for item in items)
+        ):
+            continue
+
+        def render(group: list[str]) -> str:
+            return group[0] if len(group) == 1 else "• " + "\n• ".join(group)
+
+        # Greedy maximal prefixes give the fewest order-preserving groups.
+        groups: list[list[str]] = []
+        for item in items:
+            if groups and len(render([*groups[-1], item])) <= text_limit:
+                groups[-1].append(item)
+            else:
+                groups.append([item])
+        if len(groups) > maximum:
+            continue  # Cannot fit losslessly: retain the original validation failure.
+        # Use the available slots to keep the result readable, preserving order.
+        while len(groups) < maximum:
+            index = max(range(len(groups)), key=lambda i: len(groups[i]))
+            group = groups[index]
+            midpoint = (len(group) + 1) // 2
+            groups[index : index + 1] = [group[:midpoint], group[midpoint:]]
+        value[name] = [render(group) for group in groups]
+        changes.append(
+            ListGrouping.model_validate(
+                {
+                    "field": name,
+                    "original_count": len(items),
+                    "grouped_count": len(groups),
+                }
+            )
+        )
+    return changes
+
+
 class ReportValidationError(ValueError):
     def __init__(self, code: IssueCode, field: str = "output") -> None:
         self.issues = [ValidationIssue(field=field, code=code)]

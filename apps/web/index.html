@@ -3,7 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#122b28" />
+    <meta name="theme-color" content="#f4f7fb" />
+    <script>
+      // Resolve before styles or React load to avoid flashing the opposite theme.
+      (() => {
+        let choice = 'system';
+        try { choice = localStorage.getItem('quanthecy.theme') || 'system'; } catch {}
+        const theme = choice === 'light' || choice === 'dark' ? choice
+          : window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+        document.querySelector('meta[name="theme-color"]').content = theme === 'dark' ? '#0b1018' : '#f4f7fb';
+      })();
+    </script>
     <meta name="description" content="Your workspace for prediction-market research." />
     <title>Quanthecy — Research workspace</title>
   </head>

@@ -22,7 +22,12 @@ def collection_status() -> CollectionStatus:
         for row in Market.objects.values("platform").annotate(
             total=Count("id"),
             fresh=Count(
-                "id", filter=Q(status="OPEN", last_observed_at__gte=now - timedelta(seconds=180))
+                "id",
+                filter=Q(
+                    status="OPEN",
+                    last_observed_at__gte=now - timedelta(seconds=180),
+                    last_observed_at__lte=now,
+                ),
             ),
             latest=Max("last_observed_at"),
         )
@@ -53,7 +58,11 @@ def collection_status() -> CollectionStatus:
         latest = summary.get("latest")
         delay = max(0, int((now - latest).total_seconds())) if latest else None
         state: Literal["empty", "delayed", "recent"] = (
-            "empty" if delay is None else "delayed" if delay > 180 else "recent"
+            "empty"
+            if latest is None
+            else "delayed"
+            if latest > now or (now - latest).total_seconds() > 180
+            else "recent"
         )
         sources.append(
             CollectionSource(

@@ -17,6 +17,8 @@ pub struct Journal {
     pub collector_id: Uuid,
     pub batch_id: u64,
     pub universe: BTreeMap<String, Vec<String>>,
+    #[serde(default)]
+    pub selection: Option<crate::selection::Selection>,
     pub latest: BTreeMap<String, Value>,
     pub pending: Vec<Value>,
     pub raw: Vec<Value>,
@@ -46,6 +48,9 @@ impl Spool {
                 ..Journal::default()
             }
         };
+        if let Some(selection) = &journal.selection {
+            selection.validate()?;
+        }
         let spool = Self {
             journal,
             path,
@@ -62,6 +67,18 @@ impl Spool {
         file.sync_all()?;
         fs::rename(temporary, &self.path)?;
         File::open(self.path.parent().expect("spool directory"))?.sync_all()?;
+        Ok(())
+    }
+
+    pub fn apply_selection(&mut self, selection: crate::selection::Selection) -> Result<(), Error> {
+        if !selection.supersedes(self.journal.selection.as_ref())? {
+            return Ok(());
+        }
+        let previous = self.journal.selection.replace(selection);
+        if let Err(error) = self.save() {
+            self.journal.selection = previous;
+            return Err(error);
+        }
         Ok(())
     }
 

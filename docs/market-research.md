@@ -143,7 +143,11 @@ Rust `/health` reports process liveness; `/status` and `/ready` describe collect
 cycles and failures. Container liveness alone does not prove fresh source data.
 Inspect logs using `docker compose logs -f market-data worker`.
 
-## Signal definition: rest-window-v1
+## Signal definition: rest-window-v2
+
+Version 2 retains the numerical thresholds below and adds the
+[research data quality policy](data-quality.md). Existing v1 signals retain their
+original IDs and can be reproduced with `signals.replay("rest-window-v1", inputs)`.
 
 Analytics run in the Python worker, never in an HTTP request or LLM. The initial
 definition requires an observed 15-minute window, at least ten samples, no interval

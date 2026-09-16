@@ -1,0 +1,7 @@
+{% load console %}<button class="console-backdrop" type="button" aria-label="{% ct 'Close navigation' '收起导航' %}" tabindex="-1"></button>
+<aside id="console-sidebar" class="console-sidebar">
+  <a href="{% url 'admin:index' %}" class="console-brand"><span class="console-logo">Q<span></span></span><span>Quanthecy<small>{% ct 'PLATFORM OPERATIONS' '平台运营控制台' %}</small></span></a>
+  <nav aria-label="{% ct 'Main navigation' '主导航' %}">{% for section in console_navigation %}<div class="console-nav-section"><p>{{ section.title }}</p>{% for item in section.links %}<a href="{{ item.url }}" {% if item.active %}class="active" aria-current="page"{% endif %}><svg class="console-icon" aria-hidden="true"><use href="#icon-{{ item.icon }}"></use></svg><span>{{ item.title }}</span>{% if item.active %}<span class="console-nav-dot"></span>{% endif %}</a>{% endfor %}</div>{% endfor %}</nav>
+  <details class="console-resources"><summary>{% ct 'All resources' '全部管理资源' %}</summary>{% for app in available_apps %}{% for model in app.models %}{% if model.admin_url %}<a href="{{ model.admin_url }}">{{ model|model_label }}</a>{% endif %}{% endfor %}{% endfor %}</details>
+  <div class="console-sidebar-footer"><span class="console-avatar">{{ user.email|first|upper }}</span><div><strong>{% if user.is_superuser %}{% ct 'Administrator' '超级管理员' %}{% else %}{% ct 'Platform operator' '平台操作员' %}{% endif %}</strong><small>{% ct 'Permissions enforced' '按授权范围管理' %}</small></div></div>
+</aside>

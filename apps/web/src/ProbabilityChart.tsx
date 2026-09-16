@@ -1,4 +1,6 @@
 import { t, locale, useLanguage } from './i18n'
+import { useTheme } from './theme'
+import { chartColors } from './chartTheme'
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { init, use as registerCharts, type EChartsCoreOption } from 'echarts/core'
 import { LineChart, BarChart, ScatterChart } from 'echarts/charts'
@@ -15,6 +17,7 @@ export default function ProbabilityChart({ rows, signals = [], focus, onSignals,
   rows: Observation[]; signals?: Signal[]; focus?: string; onSignals?: (signals: Signal[]) => void; resetKey?: number; area?: boolean; autoScale?: boolean; events?: Evidence[]; onEvidence?: (items: Evidence[]) => void; viewport?: RefObject<ChartViewport>;
 }) {
   const language = useLanguage()
+  const { theme } = useTheme()
   const element = useRef<HTMLDivElement>(null)
   const instance = useRef<ReturnType<typeof init> | null>(null)
   const callback = useRef(onSignals), evidenceCallback = useRef(onEvidence)
@@ -47,45 +50,46 @@ export default function ProbabilityChart({ rows, signals = [], focus, onSignals,
   useEffect(() => {
     const chart = instance.current
     if (!chart) return
+    const colors = chartColors(theme)
     const last = data.probability.at(-1)?.[1]
-    const axisStyle = { axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: '#a9b4c7', fontSize: 12 }, splitLine: { lineStyle: { color: '#272c39', width: 1 } } }
+    const axisStyle = { axisLine: { show: false }, axisTick: { show: false }, axisLabel: { color: colors.muted, fontSize: 12 }, splitLine: { lineStyle: { color: colors.grid, width: 1 } } }
     const byTime = new Map(rows.map((row) => [Date.parse(row.received_at), row]))
     const points = eventBuckets(signals, (signal) => signal.received_at).flatMap((group) => {
       const signal = group.at(-1)!, at = Date.parse(signal.received_at), row = byTime.get(at)
-      return row?.probability ? [{ value: [at, row.probability.value * 100], signals: group, count: group.length, itemStyle: { color: group.every((item) => item.signal_type === 'PROBABILITY_DROP') ? '#f47f88' : '#f0bd66' } }] : []
+      return row?.probability ? [{ value: [at, row.probability.value * 100], signals: group, count: group.length, itemStyle: { color: group.every((item) => item.signal_type === 'PROBABILITY_DROP') ? colors.negative : colors.warning } }] : []
     })
     const eventPoints = eventBuckets(events, (event) => event.observed_at).flatMap((group) => {
       const at = Date.parse(group.at(-1)!.observed_at)
       const nearest = rows.reduce<Observation | null>((best, row) => !best || Math.abs(Date.parse(row.received_at) - at) < Math.abs(Date.parse(best.received_at) - at) ? row : best, null)
       return nearest?.probability && Math.abs(Date.parse(nearest.received_at) - at) <= 90000 ? [{ value: [at, nearest.probability.value * 100], evidence: group, count: group.length }] : []
     })
-    const markerLabel = { show: true, position: 'top', fontSize: 10, color: '#dce6f4', backgroundColor: '#162130', padding: [2, 3], borderRadius: 2, formatter: (params: { data: { count: number } }) => params.data.count > 1 ? String(params.data.count) : '' }
+    const markerLabel = { show: true, position: 'top', fontSize: 10, color: colors.text, backgroundColor: colors.surface, padding: [2, 3], borderRadius: 2, formatter: (params: { data: { count: number } }) => params.data.count > 1 ? String(params.data.count) : '' }
     const bounds = autoScale ? probabilityBounds(data.probability.map((point) => point[1])) : { min: 0, max: 100 }
     const option: EChartsCoreOption = {
       backgroundColor: 'transparent', animation: !window.matchMedia('(prefers-reduced-motion: reduce)').matches,
       animationDuration: 250, animationDurationUpdate: 200,
       textStyle: { fontFamily: 'ui-monospace, SFMono-Regular, Consolas, monospace' },
       grid: [{ left: 20, right: 82, top: 18, height: '60%' }, { left: 20, right: 82, top: '69%', height: '10%' }, { left: 20, right: 82, top: '86%', height: '7%' }],
-      axisPointer: { link: [{ xAxisIndex: 'all' }], label: { backgroundColor: '#344255' }, lineStyle: { color: '#75859d' } },
+      axisPointer: { link: [{ xAxisIndex: 'all' }], label: { backgroundColor: colors.pointer, color: '#ffffff' }, lineStyle: { color: colors.crosshair } },
       tooltip: { trigger: 'axis', showContent: false, axisPointer: { type: 'cross' } },
-      xAxis: [0, 1, 2].map((gridIndex) => ({ ...axisStyle, gridIndex, type: 'time', boundaryGap: false, splitLine: { show: true, lineStyle: { color: '#202632' } }, axisLabel: { color: '#a9b4c7', fontSize: 11, show: gridIndex === 2, hideOverlap: true }, axisPointer: { show: true, label: { show: gridIndex === 2, formatter: (params: { value: number }) => new Date(params.value).toLocaleString(locale()) } } })),
+      xAxis: [0, 1, 2].map((gridIndex) => ({ ...axisStyle, gridIndex, type: 'time', boundaryGap: false, splitLine: { show: true, lineStyle: { color: colors.gridMinor } }, axisLabel: { color: colors.muted, fontSize: 11, show: gridIndex === 2, hideOverlap: true }, axisPointer: { show: true, label: { show: gridIndex === 2, formatter: (params: { value: number }) => new Date(params.value).toLocaleString(locale()) } } })),
       yAxis: [
-        { ...axisStyle, gridIndex: 0, type: 'value', position: 'right', ...bounds, axisLabel: { color: '#a9b4c7', fontSize: 12, formatter: (value: number) => chartNumber(value, '%') }, axisPointer: { label: { formatter: (params: { value: number }) => chartNumber(params.value, '%') } } },
-        { ...axisStyle, gridIndex: 1, type: 'value', position: 'right', splitNumber: 2, name: `VOL · ${data.volumeUnit ?? t("N/A")}`, nameTextStyle: { color: '#a9b4c7', fontSize: 11, align: 'right' }, axisLabel: { color: '#a9b4c7', fontSize: 11, formatter: (value: number) => new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(value) }, axisPointer: { label: { formatter: (params: { value: number }) => chartNumber(params.value) } } },
-        { ...axisStyle, gridIndex: 2, type: 'value', position: 'right', splitNumber: 2, name: 'SPREAD · pp', nameTextStyle: { color: '#a9b4c7', fontSize: 11, align: 'right' }, axisLabel: { color: '#a9b4c7', fontSize: 11, formatter: (value: number) => chartNumber(value) }, axisPointer: { label: { formatter: (params: { value: number }) => chartNumber(params.value, ' pp') } } },
+        { ...axisStyle, gridIndex: 0, type: 'value', position: 'right', ...bounds, axisLabel: { color: colors.muted, fontSize: 12, formatter: (value: number) => chartNumber(value, '%') }, axisPointer: { label: { formatter: (params: { value: number }) => chartNumber(params.value, '%') } } },
+        { ...axisStyle, gridIndex: 1, type: 'value', position: 'right', splitNumber: 2, name: `VOL · ${data.volumeUnit ?? t("N/A")}`, nameTextStyle: { color: colors.muted, fontSize: 11, align: 'right' }, axisLabel: { color: colors.muted, fontSize: 11, formatter: (value: number) => new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(value) }, axisPointer: { label: { formatter: (params: { value: number }) => chartNumber(params.value) } } },
+        { ...axisStyle, gridIndex: 2, type: 'value', position: 'right', splitNumber: 2, name: 'SPREAD · pp', nameTextStyle: { color: colors.muted, fontSize: 11, align: 'right' }, axisLabel: { color: colors.muted, fontSize: 11, formatter: (value: number) => chartNumber(value) }, axisPointer: { label: { formatter: (params: { value: number }) => chartNumber(params.value, ' pp') } } },
       ],
-      dataZoom: [{ type: 'inside', xAxisIndex: [0, 1, 2], filterMode: 'none', zoomOnMouseWheel: true, moveOnMouseMove: true, ...(viewport?.current ?? {}) }, { type: 'slider', xAxisIndex: [0, 1, 2], show: false, bottom: 2, height: 16, borderColor: '#253044', backgroundColor: '#121b27', fillerColor: '#41cbbb20', showDetail: false, handleSize: 12, dataBackground: { lineStyle: { color: '#37676d' }, areaStyle: { color: '#1b3f46' } } }],
+      dataZoom: [{ type: 'inside', xAxisIndex: [0, 1, 2], filterMode: 'none', zoomOnMouseWheel: true, moveOnMouseMove: true, ...(viewport?.current ?? {}) }, { type: 'slider', xAxisIndex: [0, 1, 2], show: false, bottom: 2, height: 16, borderColor: colors.border, backgroundColor: colors.zoom, fillerColor: colors.zoomFill, showDetail: false, handleSize: 12, dataBackground: { lineStyle: { color: colors.zoomLine }, areaStyle: { color: colors.zoomArea } } }],
       series: [
-        { name: 'YES midpoint', type: 'line', data: data.probability, connectNulls: false, showSymbol: rows.length < 3, symbolSize: 5, lineStyle: { color: '#38c9b1', width: 2.4 }, itemStyle: { color: '#50d6c5' }, areaStyle: area ? { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: '#38cdb038' }, { offset: 1, color: '#38cdb000' }] } } : undefined,
-          markLine: { silent: true, symbol: 'none', data: last == null ? [] : [{ yAxis: last }], lineStyle: { color: '#50d6c570', type: 'dashed' }, label: { formatter: chartNumber(last, '%'), color: '#0b151c', backgroundColor: '#50d6c5', padding: [4, 5], borderRadius: 3 } } },
-        { name: 'News first observed', type: 'scatter', data: eventPoints, symbol: 'rect', symbolSize: 9, symbolOffset: [0, 20], label: { ...markerLabel, position: 'bottom' }, itemStyle: { color: '#8dacf6' }, cursor: 'pointer', z: 4 },
+        { name: 'YES midpoint', type: 'line', data: data.probability, connectNulls: false, showSymbol: rows.length < 3, symbolSize: 5, lineStyle: { color: colors.line, width: 2.4 }, itemStyle: { color: colors.positive }, areaStyle: area ? { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: colors.areaTop }, { offset: 1, color: colors.areaBottom }] } } : undefined,
+          markLine: { silent: true, symbol: 'none', data: last == null ? [] : [{ yAxis: last }], lineStyle: { color: colors.lastLine, type: 'dashed' }, label: { formatter: chartNumber(last, '%'), color: colors.onAccent, backgroundColor: colors.positive, padding: [4, 5], borderRadius: 3 } } },
+        { name: 'News first observed', type: 'scatter', data: eventPoints, symbol: 'rect', symbolSize: 9, symbolOffset: [0, 20], label: { ...markerLabel, position: 'bottom' }, itemStyle: { color: colors.news }, cursor: 'pointer', z: 4 },
         { name: 'Signals', type: 'scatter', data: points, symbol: 'diamond', symbolSize: 11, label: markerLabel, z: 5, cursor: 'pointer', emphasis: { scale: 1.3, itemStyle: { borderColor: '#fff', borderWidth: 1 } } },
-        { name: 'Sampled volume change', type: 'bar', xAxisIndex: 1, yAxisIndex: 1, data: data.volume, itemStyle: { color: '#3c827d' }, barMaxWidth: 12 },
-        { name: 'Bid/ask spread', type: 'line', xAxisIndex: 2, yAxisIndex: 2, data: data.spread, connectNulls: false, showSymbol: false, lineStyle: { color: '#b8a0ec', width: 1.5 } },
+        { name: 'Sampled volume change', type: 'bar', xAxisIndex: 1, yAxisIndex: 1, data: data.volume, itemStyle: { color: colors.volume }, barMaxWidth: 12 },
+        { name: 'Bid/ask spread', type: 'line', xAxisIndex: 2, yAxisIndex: 2, data: data.spread, connectNulls: false, showSymbol: false, lineStyle: { color: colors.spread, width: 1.5 } },
       ],
     }
     chart.setOption(option, { replaceMerge: ['series'] })
-  }, [rows, signals, events, area, autoScale, data, viewport, language])
+  }, [rows, signals, events, area, autoScale, data, viewport, language, theme])
   useEffect(() => {
     if (!focus || !instance.current) return
     const at = Date.parse(focus)

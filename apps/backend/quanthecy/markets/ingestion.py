@@ -91,9 +91,10 @@ def process_batch(repository: ClickHouseRepository, collector: UUID) -> bool:
                 UUID(row["market"]["id"]),
                 start=(end - timedelta(minutes=20)).isoformat(),
                 end=end.isoformat(),
-                limit=1000,
+                known_at=row["recorded_at"],
+                limit=1001,
             )
-            metrics, signals = analyze(history)
+            metrics, signals = analyze(history[:1000], truncated=len(history) > 1000)
             repository.save_signals(signals)
             reconcile(row, metrics)
         checkpoint.batch_id = int(batch["batch_id"])

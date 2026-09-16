@@ -11,6 +11,7 @@ from django.db import close_old_connections
 
 from quanthecy.markets.ingestion import run_ingestion
 from quanthecy.markets.repositories import history_repository
+from quanthecy.markets.selection import publish_selection
 from quanthecy.operations.dependencies import dependency_status
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,13 @@ class Command(BaseCommand):
             while not stopped.is_set():
                 close_old_connections()
                 dependencies = dependency_status()
+                if dependencies["postgres"]:
+                    try:
+                        publish_selection()
+                    except Exception:
+                        logger.exception(
+                            "Collection plan publication failed; collector retains last good plan"
+                        )
                 batches = 0
                 if dependencies["postgres"] and dependencies["clickhouse"]:
                     try:

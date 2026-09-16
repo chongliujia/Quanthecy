@@ -10,6 +10,23 @@ const configuration = { revision: 0, provider: 'openai_compatible', base_url: 'h
 function mount(org = organization) {
   return render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><ModelSettings userId="u1" organization={org} /></QueryClientProvider>)
 }
+it('saves an expanded output budget using the server cap without starting a request', async () => {
+  const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    const saved = init?.method === 'PUT' ? JSON.parse(String(init.body)) : {}
+    return new Response(JSON.stringify(String(input).endsWith('/csrf') ? { csrf_token: 'csrf' } : { ...configuration, max_output_tokens_limit: 65536, ...saved }))
+  })
+  mount()
+  const budget = await screen.findByLabelText('Maximum output tokens')
+  expect(budget).toHaveAttribute('max', '65536')
+  fireEvent.change(budget, { target: { value: '32768' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }))
+  await screen.findByText('Configuration saved. No model request was made.')
+  const sent = JSON.parse(String(fetch.mock.calls.find(([, init]) => init?.method === 'PUT')?.[1]?.body))
+  expect(sent.max_output_tokens).toBe(32768)
+  expect(sent.max_output_tokens_limit).toBeUndefined()
+  expect(fetch.mock.calls.some(([url]) => /\/(test|runs)$/.test(String(url)))).toBe(false)
+})
+
 it('saves credentials without sending a test and clears the secret field after saving', async () => {
   const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
     const path = String(input)

@@ -1,0 +1,17 @@
+{% extends "admin/base.html" %}{% load static console %}
+{% block title %}{{ console_heading|default:title }} · Quanthecy{% endblock %}
+{% block dark-mode-vars %}{% endblock %}
+{% block responsive %}{{ block.super }}<link rel="stylesheet" href="{% static 'quanthecy/console.css' %}"><script src="{% static 'quanthecy/console.js' %}" defer></script>{% endblock %}
+{% block branding %}<div class="console-top-brand"><button type="button" class="console-menu" aria-controls="console-sidebar" aria-expanded="false" aria-label="{% ct 'Toggle navigation' '展开或收起导航' %}">☰</button><span class="console-wordmark">Quanthecy</span><span class="console-separator">/</span><span>{% ct 'Operations console' '运营控制台' %}</span></div>{% endblock %}
+{% block usertools %}<div class="console-tools">
+  {% include 'admin/quanthecy/language.html' %}
+  {% if has_permission %}<span class="console-account" title="{{ user.email }}"><span class="console-avatar">{{ user.email|first|upper }}</span><span>{{ user.email }}</span></span>
+  <a class="console-password" href="{% url 'admin:password_change' %}">{% ct 'Password' '修改密码' %}</a>
+  <form method="post" action="{% url 'admin:logout' %}">{% csrf_token %}<button type="submit" class="console-link-button">{% ct 'Log out' '退出' %}</button></form>{% endif %}
+</div>{% endblock %}
+{% block nav-breadcrumbs %}{% endblock %}
+{% block nav-sidebar %}{% if has_permission %}{% include 'admin/quanthecy/navigation.html' %}{% endif %}{% endblock %}
+{% block content_title %}{% if title %}<div class="console-page-heading"><div><p class="console-eyebrow">QUANTHECY / {% ct 'ADMINISTRATION' '平台管理' %}</p><h1>{{ console_heading|default:title }}</h1></div><span class="console-time">{{ console_now|date:"Y.m.d" }} <span>UTC</span></span></div>{% endif %}{% endblock %}
+{% block content_subtitle %}{% if subtitle %}<p class="console-subtitle">{{ subtitle }}</p>{% endif %}{% endblock %}
+{% block footer %}<span>Quanthecy · {% ct 'Platform administration' '平台运营管理' %}</span><span>{% ct 'All times in UTC' '所有时间均为 UTC' %}</span>{% endblock %}
+{% block extrabody %}{% include 'admin/quanthecy/icons.html' %}{% endblock %}

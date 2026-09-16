@@ -5,6 +5,7 @@ from uuid import UUID
 from ninja import Schema
 from pydantic import Field
 from quanthecy_analytics.contracts.market import MarketObservation
+from quanthecy_analytics.quality import ResearchQuality, WindowQuality, research_quality
 
 
 class Metrics(Schema):
@@ -20,6 +21,7 @@ class Metrics(Schema):
     sample_count: int | None = None
     volume_unit: str | None = None
     volume_rate: float | None = None
+    quality: WindowQuality | None = None
 
 
 class MarketSummary(Schema):
@@ -36,6 +38,7 @@ class MarketSummary(Schema):
     best_ask: float | None
     quality_flags: list[str]
     metrics: Metrics
+    data_quality: ResearchQuality
 
 
 class MarketPage(Schema):
@@ -87,7 +90,7 @@ class SignalOut(Schema):
     observation_ids: list[UUID]
 
 
-def summary_values(market: Any, stale: bool) -> dict[str, Any]:
+def summary_values(market: Any, stale: bool, at: datetime) -> dict[str, Any]:
     row = market.latest
     return {
         "id": market.id,
@@ -103,4 +106,5 @@ def summary_values(market: Any, stale: bool) -> dict[str, Any]:
         "best_ask": row["best_ask"],
         "quality_flags": row["quality_flags"],
         "metrics": market.metrics,
+        "data_quality": research_quality(row, market.metrics, at),
     }

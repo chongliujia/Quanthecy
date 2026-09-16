@@ -28,6 +28,11 @@ the organization-scoped `GET /agent/skills` endpoint.
 
 ## Context and working memory
 
+`context-v5` additionally includes bounded passages from captured official documents,
+using the exact evidence version known at the cutoff. See
+[official-evidence.md](official-evidence.md) for source restrictions, paragraph
+selection, versioning and limits. Old run contexts remain immutable.
+
 1. Freeze observations known at the research cutoff, the last 20-minute analytical
    window, contract rules, deterministic metrics, signals, up to eight associated
    news revisions and five reviewed comparisons.
@@ -38,8 +43,10 @@ the organization-scoped `GET /agent/skills` endpoint.
    truncate. The entire stage packet, including schema and peer memory, is capped
    at 80,000 UTF-8 bytes. These are byte limits, not tokenizer-specific token counts.
 4. Validate specialist outputs before sharing them. Memory consists of a short
-   conclusion, up to four findings, three challenges, limitations and observations
-   to monitor. Each specialist output is capped at 14,000 bytes. No raw transcript
+   conclusion, up to four findings, three challenges and three observations to
+   monitor. All specialists, including event intelligence and risk review, can
+   supply up to twelve limitation groups. Each specialist
+   output is capped at 14,000 bytes. No raw transcript
    or model scratchpad is stored or passed on. Referenced peer evidence must be
    present in the receiving stage's scope.
 5. Save per-stage source IDs, omissions, dependencies, input/system hashes, skill
@@ -74,10 +81,26 @@ feature, separate from this initial inference workflow.
 
 ## Report format compatibility and diagnostics
 
-`research-team-v2` / skills `1.1.0` use a 600-character specialist claim limit in
-both the schema sent to the model and the validator. The prompt supplies a JSON
-example and explicit permitted citation IDs; the schema restricts references to
-the stage's scope. Field names and enum values remain in English in Chinese reports.
+`research-team-v5` / skills `1.4.0` keep the 600-character specialist claim limit
+consistent between prompts, schemas and validation. All specialists now allow
+twelve limitation groups; the previous four-item cap for independent specialists
+caused the September 16 event-intelligence failure despite adequate output tokens.
+Examples, allowed citation IDs and `output_limits` still ask the model to comply
+with the canonical schema.
+
+Before stage validation, a bounded local formatter may group consecutive strings
+in `limitations`, `watch_for`, `risk_flags` or `follow_up` when only their item count
+exceeds the schema limit. It handles at most 64 original items, preserves every
+original character and item order, and adds bullet separators. It does not rewrite,
+deduplicate, truncate, or use another model request. Each resulting group must fit
+the original per-item text limit, and the complete specialist result must still fit
+14,000 UTF-8 bytes. If grouping cannot fit losslessly, validation still fails.
+
+Claims, citations, signals, forecast fields and other fields are never grouped or
+repaired. Normal schema, reference and forecast checks run after grouping. Successful
+steps record `format_adjustments` (field, original count, grouped count, method), which
+the UI displays. Invalid outputs are never published merely because a text-list
+format could be corrected. The stage API uses the same canonical output schemas.
 
 Local parsing accepts one complete JSON object, optionally wrapped in a single
 JSON Markdown fence. It rejects truncation, duplicate keys, trailing prose and
@@ -107,6 +130,24 @@ including unused capacity after failure/cancellation. It is not a currency budge
 Actual attempted calls and returned tokens are saved separately. Each stage uses
 the configured per-request output limit; there are no automatic retries.
 
+The configurable output allowance is 256–65,536 tokens per request. The settings
+API advertises the server ceiling, and the UI uses it for validation. Existing
+workspaces keep their value unless an owner changes it; connection tests still
+request at most 256 tokens. A provider/model may support a lower ceiling. Some
+providers count reasoning in this allowance, so it is not the final report size
+or the amount of input evidence. Structured report and evidence budgets remain
+independent. For the local user's enabled `deepseek-flash` connection, the requested
+increase is to 32,768 tokens, below the current
+[official model output limit](https://api-docs.deepseek.com/quick_start/pricing/).
+
+Requests above 8,000 tokens have a 300-second socket timeout and a 320-second
+subprocess deadline. Their run lease exceeds that deadline by 60 seconds, for
+both single and team research. Smaller requests retain the previous 40/60-second
+timeouts. Response reads scale with the token budget, including escaped Unicode
+and provider reasoning, with an absolute 8 MiB ceiling. Only returned report text
+and token counts leave the provider adapter; provider reasoning is not persisted.
+Cancellation and worker shutdown can still terminate the child process promptly.
+
 Each stage renews the current lease and rechecks organization membership and model
 configuration before sending. Cancellation, revocation, changed configuration,
 invalid evidence or provider failure prevents further stages and final
@@ -130,9 +171,15 @@ No paid model calls are required by these checks. Current source coverage remain
 the existing collected market data and indexed official feeds; this feature does
 not add broad financial-news search or unrestricted web research.
 
-The full regression run passed 137 Python tests (two opt-in ClickHouse tests
-skipped) and 31 frontend tests. Ruff, mypy, lint, migration consistency and both
-production image builds passed. Isolated Chrome checks verified the actual skill
+Regression coverage includes independent specialists with twelve limitations,
+lossless Unicode grouping of 13, 36 and 64 original items, ungroupable items,
+invalid citations/types, forecast gates, whole-result memory limits, complete
+five-stage execution and public API serialization. Both the risk review and final
+synthesis retain all caveats without a sixth model request. UI checks cover Chinese
+system warnings and visible grouping notices. Existing failed reports remain
+failed: their rejected raw output was not retained and cannot be reconstructed.
+
+Earlier isolated Chrome checks verified the actual skill
 catalog and disabled-model state, then intercepted the analysis API with explicitly
 labeled synthetic responses to check report rendering, citation expansion and a
 390px mobile viewport. No generation request reached the backend in UI verification.
@@ -141,3 +188,5 @@ Synthetic UI previews: [expert findings](screenshots/intelligence-experts.png),
 [forecast abstention](screenshots/intelligence-report.png) and
 [mobile workspace](screenshots/intelligence-mobile.png). These are interface test
 examples, not actual model forecasts or analyses of the visible market.
+
+Event dossier reviews and probability eligibility are documented in [event-evidence.md](event-evidence.md).

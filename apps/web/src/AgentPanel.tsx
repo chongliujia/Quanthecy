@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type Organization } from './api'
 import { activeRun, runError, type AgentRun, type AgentStatus, type Claim, type ResearchSkill } from './agentTypes'
 import { ExpertTeam, ForecastView } from './IntelligenceView'
+import { FrozenEvidence } from './EventPages'
 import ValidationNotice from './ValidationNotice'
 import { ErrorNotice } from './ResearchUI'
 import { readable, time } from './format'
@@ -59,6 +60,7 @@ export default function AgentPanel({ userId, organization, marketId, cutoff }: {
       {cancel.error && <p role="alert" className="error">{t(cancel.error.message)}</p>}
       {run.state === 'FAILED' && (run.error_code === 'invalid_report' ? <ValidationNotice issues={run.validation_errors} stage={run.steps?.find(step => step.state === 'FAILED')?.name} /> : <p className="error" role="alert">{runError(run.error_code)}</p>)}
       {run.state === 'CANCELLED' && <p>{t("This request was cancelled. Any already submitted model call may still incur usage.")}</p>}
+      {run.steps?.some(step => step.format_adjustments?.length) && <p className="format-note">{t('Some text lists were grouped locally to fit the report format. Every original item was preserved. Open the expert card for details.')}</p>}
       {run.report && <>
         <h3>{t('Synthesis report')}</h3>
         <div className="research-decision"><span>{t(run.report.action)}</span><strong>{Math.round(run.report.confidence * 100)}<small>%</small></strong></div>
@@ -71,7 +73,7 @@ export default function AgentPanel({ userId, organization, marketId, cutoff }: {
         <h4>{t("Research limitations")}</h4><ul>{run.report.risk_flags.map((flag, i) => <li key={i}>{flag}</li>)}</ul>
         <h4>{t("Next observations")}</h4><ul>{run.report.follow_up.map((item, i) => <li key={i}>{item}</li>)}</ul>
       </>}
-      {!!run.context?.references?.length && <details className="reference-library"><summary>{t('Frozen references')} · {run.context.references.length}</summary>{run.context.references.map((ref) => <details id={`reference-${run.id}-${ref.id}`} className="frozen-reference" key={ref.id}><summary>{ref.label}</summary><pre>{typeof ref.value === 'string' ? ref.value : JSON.stringify(ref.value, null, 2)}</pre>{ref.url && <a href={ref.url} target="_blank" rel="noopener noreferrer">{t("Open source ↗")}</a>}</details>)}</details>}
+      {!!run.context?.references?.length && <details className="reference-library"><summary>{t('Frozen references')} · {run.context.references.length}</summary>{run.context.references.map((ref) => <details id={`reference-${run.id}-${ref.id}`} className="frozen-reference" key={ref.id}><summary>{ref.label}</summary><FrozenEvidence reference={ref} /><pre>{typeof ref.value === 'string' ? ref.value : JSON.stringify(ref.value, null, 2)}</pre>{ref.url && <a href={ref.url} target="_blank" rel="noopener noreferrer">{t("Open source ↗")}</a>}</details>)}</details>}
       <p className="run-provenance">{t("Cutoff")} {time(run.cutoff)}<br />{run.model} · {run.prompt_version} {t("· configuration v")}{run.configuration_revision}</p>
     </div>}
     {!runs.data?.length && !runs.isPending && <div className="agent-empty"><span>◇</span><strong>{t("Your research starts here")}</strong><p>{t("Reports connect market observations, event evidence and contract rules in one place.")}</p></div>}

@@ -1,17 +1,26 @@
 from datetime import date
 from typing import Any
 
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand, CommandError, CommandParser
 from django.db import transaction
 
 from quanthecy.markets.models import CollectionTarget, Market, ResearchTopic
 from quanthecy.research.events import append_definition, sync_event_candidates
+from quanthecy.research.feed_registry import FEEDS
 from quanthecy.research.models import EventDefinition, EventMarketLink, ResearchEvent
 from quanthecy.research.reviews import snapshot
 
 
 class Command(BaseCommand):
     help = "Initialize the October 2026 Fed event; no evidence is approved."
+
+    def add_arguments(self, parser: CommandParser) -> None:
+        parser.add_argument(
+            "--expand-news",
+            action="store_true",
+            help="Append a new scope with curated official/media discovery; "
+            "old reviews stay on the old scope.",
+        )
 
     @transaction.atomic
     def handle(self, *args: Any, **options: Any) -> None:
@@ -46,6 +55,25 @@ class Command(BaseCommand):
                     ends_on=date(2026, 10, 28),
                     calendar_url="https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
                     source_slugs=["fed-monetary", "fed-speeches"],
+                )
+            )
+        previous = event.definitions.order_by("-version").first()
+        if options.get("expand_news") and previous and previous.discovery_policy != "fed-macro-v1":
+            append_definition(
+                EventDefinition(
+                    event=event,
+                    title=previous.title,
+                    title_zh=previous.title_zh,
+                    scope=previous.scope + " Curated US macro announcements and media reporting "
+                    "are discovery candidates only; "
+                    "support/opposition must name a specific contract outcome.",
+                    scope_zh=previous.scope_zh + " 精选美国宏观公告与媒体报道仅作为待审核候选；"
+                    "支持或反对必须指定具体合约结果。",
+                    starts_on=previous.starts_on,
+                    ends_on=previous.ends_on,
+                    calendar_url=previous.calendar_url,
+                    source_slugs=list(FEEDS),
+                    discovery_policy="fed-macro-v1",
                 )
             )
         count = 0

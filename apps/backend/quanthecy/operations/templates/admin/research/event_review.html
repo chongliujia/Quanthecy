@@ -10,8 +10,12 @@
     <p>{{ review_candidate.definition.scope }}</p>
     {% if console_is_zh %}<p>{{ review_candidate.definition.scope_zh }}</p>{% endif %}
     <p>{% if console_is_zh %}“直接相关”仅表示与事件有关，不表示支持任何合约结果，也不证明价格变化原因。请选择原文段落，并说明其适用范围与局限。{% else %}Direct relevance does not support a contract outcome or prove a cause of price changes. Cite original paragraphs and explain relevance and limitations.{% endif %}</p>
+    <p>{% if console_is_zh %}关联候选仅供审核，排序不代表概率或影响。支持／反对必须指定下列某份合约的结果；摘要引用不能替代官方正文预测依据。{% else %}Discovery priority is for review, not probability or impact. Support/opposition must name a contract outcome. Feed quotes cannot replace official full-text forecast evidence.{% endif %}</p>
+    {% if review_candidate.discovery %}<details><summary>{% if console_is_zh %}查看匹配依据{% else %}Discovery basis{% endif %}</summary><p>{{ review_candidate.discovery.method }} · {{ review_candidate.discovery.reasons|join:", " }}</p>{% for match in review_candidate.discovery.matches %}<blockquote>{{ match.field }} {% if match.paragraph %}[{{ match.paragraph }}]{% endif %}: {{ match.text }}</blockquote>{% endfor %}</details>{% endif %}
+    <details><summary>{% if console_is_zh %}核对目标合约与结算规则{% else %}Inspect target contracts and settlement rules{% endif %}</summary>{% for link in review_contracts %}<h4>{{ link }}</h4><p>{{ link.snapshot.market.resolution_rules }}</p>{% endfor %}</details>
     <h3>{{ review_candidate.revision.title }} · v{{ review_candidate.revision.version }}</h3>
-    <a href="{{ review_candidate.revision.url }}" target="_blank" rel="noopener noreferrer">{% if console_is_zh %}官方来源 ↗{% else %}Official source ↗{% endif %}</a>
+    <p>{% if review_source.kind == "OFFICIAL" %}{% if console_is_zh %}官方来源{% else %}Official source{% endif %}{% elif review_source.kind == "MEDIA" %}{% if console_is_zh %}媒体报道{% else %}Media reporting{% endif %}{% else %}{% if console_is_zh %}来源类型未知{% else %}Unknown source type{% endif %}{% endif %} · {{ review_candidate.revision.item.source.name }}</p>
+    <a href="{{ review_candidate.revision.url }}" target="_blank" rel="noopener noreferrer">{% if console_is_zh %}原始来源 ↗{% else %}Original source ↗{% endif %}</a>
     {% for paragraph in review_paragraphs %}<p><strong>[{{ forloop.counter }}]</strong> {{ paragraph }}</p>{% empty %}<p>{{ review_candidate.revision.excerpt }}</p>{% endfor %}
   </div>
 </fieldset>

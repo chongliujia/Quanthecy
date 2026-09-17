@@ -274,3 +274,17 @@ def test_unrelated_business_news_not_associated(source):
         relevant.pk
     ]
     assert EvidenceLink.objects.get().status == "TOPIC_ONLY"
+
+
+def test_upgraded_source_refreshes_counters_instead_of_accepting_304(source):
+    source.etag = "old-etag"
+    source.last_modified = "old-date"
+    source.last_success_at = timezone.now()
+    source.save()
+    with patch(
+        "quanthecy.research.news.fetch_feed", return_value=(rss(item()), "new-etag", "")
+    ) as fetch:
+        poll_one_source()
+    assert fetch.call_args.kwargs["etag"] == fetch.call_args.kwargs["last_modified"] == ""
+    source.refresh_from_db()
+    assert source.last_entry_count == 1

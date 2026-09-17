@@ -121,7 +121,7 @@ This screenshot shows the team **before execution**, not a completed report. A t
 <details>
 <summary>Event dossiers and official evidence</summary>
 
-Beyond the inspector, event dossiers organize scope, linked contracts, evidence, and changes. Documents retain publication and observation times and saved versions. Operators review the relevance of an exact document version to an exact event definition; new versions require a new review. See the [event evidence guide](docs/event-evidence.md).
+Beyond the inspector, event dossiers organize scope, linked contracts, evidence, and changes. Content rules suggest official and media candidates with matching reasons and original snippets. Operators review an exact document version against an exact event definition and can record support or opposition for a specific contract outcome. New versions require a new review; saved-version differences remain inspectable. See the [event evidence guide](docs/event-evidence.md) and the [initial collection check](docs/news-quality-check.md).
 
 ![English desktop event dossier with linked contracts, evidence review counts, and a research cutoff](docs/images/en/event-dossier.png)
 

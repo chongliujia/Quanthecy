@@ -201,7 +201,17 @@ class EventDefinition(AppendOnly):
     starts_on = models.DateField()
     ends_on = models.DateField()
     calendar_url = models.URLField(max_length=1000)
-    source_slugs = models.JSONField(help_text="Official feed IDs eligible for candidate matching.")
+    source_slugs = models.JSONField(
+        help_text="Registered feed IDs eligible for candidate matching."
+    )
+    discovery_policy = models.CharField(
+        max_length=40,
+        default="source-only-v1",
+        choices=[
+            ("source-only-v1", "Selected official sources"),
+            ("fed-macro-v1", "Fed / US macro content and time window"),
+        ],
+    )
     observed_at = models.DateTimeField(default=timezone.now, editable=False, db_index=True)
 
     class Meta:
@@ -213,14 +223,17 @@ class EventDefinition(AppendOnly):
         ]
 
     def clean(self) -> None:
-        from .feed_registry import OFFICIAL_SOURCES
+        from .feed_registry import FEEDS, OFFICIAL_SOURCES
 
+        allowed = FEEDS if self.discovery_policy == "fed-macro-v1" else OFFICIAL_SOURCES
         if (
             not isinstance(self.source_slugs, list)
             or not 1 <= len(self.source_slugs) <= 10
-            or any(not isinstance(s, str) or s not in OFFICIAL_SOURCES for s in self.source_slugs)
+            or any(not isinstance(s, str) or s not in allowed for s in self.source_slugs)
         ):
-            raise ValidationError({"source_slugs": "Choose 1–10 registered official feed IDs."})
+            raise ValidationError(
+                {"source_slugs": "Choose 1–10 feed IDs allowed by the discovery policy."}
+            )
 
     def __str__(self) -> str:
         return f"{self.title} · v{self.version}"
@@ -234,6 +247,11 @@ class EventMarketLink(AppendOnly):
     )
     snapshot = models.JSONField(editable=False)
     created_at = models.DateTimeField(default=timezone.now, editable=False)
+
+    def __str__(self) -> str:
+        title = self.snapshot.get("market", {}).get("title", self.market_id)
+        outcome = self.snapshot.get("outcome", {}).get("label", "")
+        return f"{self.snapshot.get('platform', '')} · {title} · {outcome}"
 
     class Meta:
         constraints = [
@@ -249,6 +267,8 @@ class EventEvidence(AppendOnly):
         EventDefinition, on_delete=models.PROTECT, related_name="candidates"
     )
     revision = models.ForeignKey(EvidenceRevision, on_delete=models.PROTECT)
+    discovery = models.JSONField(default=dict, editable=False)
+    discovery_priority = models.PositiveSmallIntegerField(default=0, editable=False)
     created_at = models.DateTimeField(default=timezone.now, editable=False, db_index=True)
 
     class Meta:
@@ -266,6 +286,11 @@ class EventEvidenceReview(AppendOnly):
         BACKGROUND = "BACKGROUND", "Background only / 背景资料"
         UNRELATED = "UNRELATED", "Unrelated / 不相关"
 
+    class Stance(models.TextChoices):
+        UNKNOWN = "UNKNOWN", "Undetermined / 无法判断"
+        SUPPORTS = "SUPPORTS", "Supports selected outcome / 支持所选结果"
+        OPPOSES = "OPPOSES", "Opposes selected outcome / 反对所选结果"
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     candidate = models.ForeignKey(EventEvidence, on_delete=models.PROTECT, related_name="reviews")
     relation = models.CharField(max_length=20, choices=Relation.choices)
@@ -274,6 +299,11 @@ class EventEvidenceReview(AppendOnly):
         default=list,
         blank=True,
         help_text="1–5 original paragraph numbers, e.g. [2, 4]. Required for direct relevance.",
+    )
+    feed_quote = models.CharField(max_length=1000, blank=True)
+    stance = models.CharField(max_length=16, choices=Stance.choices, default=Stance.UNKNOWN)
+    target_contract = models.ForeignKey(
+        EventMarketLink, null=True, blank=True, on_delete=models.PROTECT
     )
     reviewed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, editable=False

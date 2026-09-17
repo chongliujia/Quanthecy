@@ -3,7 +3,7 @@ from typing import Any, cast
 from django.contrib import admin
 from django.core.exceptions import ValidationError
 from django.db.models import F, OuterRef, QuerySet, Subquery
-from django.forms import ModelForm
+from django.forms import ModelChoiceField, ModelForm
 from django.http import HttpRequest, HttpResponse
 from django.urls import reverse
 from django.utils.html import format_html
@@ -14,6 +14,7 @@ from quanthecy.operations.console import label
 from .admin import HistoricalAdmin
 from .documents import OfficialDocument
 from .events import append_definition, append_evidence_review, validate_review
+from .feed_registry import FEEDS
 from .models import (
     EventDefinition,
     EventEvidence,
@@ -81,15 +82,16 @@ class EventEvidenceAdmin(HistoricalAdmin):
         "document_title",
         "event_scope",
         "version",
+        "review_priority",
         "review_status",
         "review_action",
         "created_at",
     )
     list_filter = (CandidateStateFilter, "definition__event")
     search_fields = ("revision__title", "definition__title")
-    readonly_fields = ("review_action", "source_text")
+    readonly_fields = ("review_action", "source_text", "discovery", "discovery_priority")
     list_select_related = ("definition__event", "revision")
-    ordering = ("-revision__published_at", "-created_at")
+    ordering = ("-discovery_priority", "-revision__published_at", "-created_at")
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[EventEvidence]:
         return (
@@ -114,7 +116,7 @@ class EventEvidenceAdmin(HistoricalAdmin):
             )
         )
 
-    @admin.display(description=label("Official evidence", "官方证据"))
+    @admin.display(description=label("Evidence", "证据"))
     def document_title(self, obj: EventEvidence) -> str:
         return obj.revision.title
 
@@ -125,6 +127,12 @@ class EventEvidenceAdmin(HistoricalAdmin):
     @admin.display(description=label("Document version", "正文版本"))
     def version(self, obj: EventEvidence) -> int:
         return obj.revision.version
+
+    @admin.display(
+        description=label("Review priority", "审核优先级"), ordering="discovery_priority"
+    )
+    def review_priority(self, obj: EventEvidence) -> int:
+        return obj.discovery_priority
 
     @admin.display(description=label("Review status", "审核状态"))
     def review_status(self, obj: EventEvidence) -> str:
@@ -174,19 +182,52 @@ class EvidenceReviewForm(ModelForm):
         super().__init__(*args, **kwargs)
         if self.preview_candidate_id and "candidate" in self.fields:
             self.initial["candidate"] = self.preview_candidate_id
+            candidate = EventEvidence.objects.filter(pk=self.preview_candidate_id).first()
+            cast(ModelChoiceField, self.fields["target_contract"]).queryset = (
+                EventMarketLink.objects.filter(event_id=candidate.definition.event_id)
+                if candidate
+                else EventMarketLink.objects.none()
+            )
+        self.fields["stance"].required = False
 
     class Meta:
         model = EventEvidenceReview
-        fields = ("candidate", "relation", "rationale", "paragraphs")
+        fields = (
+            "candidate",
+            "relation",
+            "rationale",
+            "paragraphs",
+            "feed_quote",
+            "stance",
+            "target_contract",
+        )
         labels = {
             "candidate": label("Evidence version", "证据版本"),
             "relation": label("Relevance", "关联程度"),
             "rationale": label("Review rationale", "审核依据"),
             "paragraphs": label("Original paragraph numbers", "原文段落编号"),
+            "feed_quote": label(
+                "Exact feed quote (title or excerpt)", "订阅原文引用（标题或摘要）"
+            ),
+            "stance": label("Stance toward selected outcome", "对所选结果的立场"),
+            "target_contract": label("Target contract and outcome", "目标合约及结果"),
+        }
+        help_texts = {
+            "paragraphs": label(
+                "Use 1–5 original paragraph numbers, e.g. [2, 4]. "
+                "For direct relevance, cite paragraphs or an exact feed quote.",
+                "填写 1–5 个原文段落编号，如 [2, 4]。直接相关必须引用段落或订阅原文。",
+            ),
+            "feed_quote": label(
+                "Copy 12–1000 characters exactly from the saved title or excerpt. "
+                "Leave paragraph numbers empty when no body was captured.",
+                "从已保存的标题或摘要准确复制 12–1000 个字符。未采集正文时，段落编号保留空列表。",
+            ),
         }
 
     def clean(self) -> dict[str, Any]:
         values = super().clean() or {}
+        values["stance"] = values.get("stance") or "UNKNOWN"
         if values.get("candidate") and str(values["candidate"].pk) != self.preview_candidate_id:
             raise ValidationError(
                 "Open the candidate review link to load its original text first. / "
@@ -201,8 +242,15 @@ class EvidenceReviewForm(ModelForm):
 class EventEvidenceReviewAdmin(HistoricalAdmin):
     form = EvidenceReviewForm
     change_form_template = "admin/research/event_review.html"
-    list_display = ("candidate", "relation", "reviewed_by", "reviewed_at")
-    list_filter = ("relation", "candidate__definition__event")
+    list_display = (
+        "candidate",
+        "relation",
+        "stance",
+        "target_contract",
+        "reviewed_by",
+        "reviewed_at",
+    )
+    list_filter = ("relation", "stance", "candidate__definition__event")
     search_fields = ("candidate__revision__title", "rationale")
     autocomplete_fields = ("candidate",)
     readonly_fields = ("reviewed_by", "reviewed_at")
@@ -232,7 +280,7 @@ class EventEvidenceReviewAdmin(HistoricalAdmin):
         )
         try:
             candidate = (
-                EventEvidence.objects.select_related("definition", "revision")
+                EventEvidence.objects.select_related("definition", "revision__item__source")
                 .filter(pk=candidate_id)
                 .first()
                 if candidate_id
@@ -247,6 +295,7 @@ class EventEvidenceReviewAdmin(HistoricalAdmin):
                 else None
             )
             context["review_candidate"] = candidate
+            context["review_source"] = FEEDS.get(candidate.revision.item.source_id)
             context["review_preview_bound"] = (
                 str(candidate.pk) == request.GET.get("candidate") or obj is not None
             )
@@ -256,6 +305,9 @@ class EventEvidenceReviewAdmin(HistoricalAdmin):
                 + str(candidate.pk)
             )
             context["review_paragraphs"] = document.text.split("\n\n") if document else []
+            context["review_contracts"] = EventMarketLink.objects.filter(
+                event_id=candidate.definition.event_id
+            ).order_by("id")[:100]
         return super().render_change_form(request, context, add, change, form_url, obj)
 
     def save_model(

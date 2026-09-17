@@ -6,10 +6,11 @@ from uuid import UUID
 
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
-from django.db.models import Exists, OuterRef, QuerySet, Subquery
+from django.db.models import Exists, OuterRef, Prefetch, QuerySet, Subquery
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
+from .discovery import discover
 from .documents import OfficialDocument
 from .event_schemas import (
     EventChange,
@@ -20,7 +21,7 @@ from .event_schemas import (
     EventSummary,
     Passage,
 )
-from .feed_registry import OFFICIAL_SOURCES
+from .evidence_changes import revision_changes
 from .models import (
     EventDefinition,
     EventEvidence,
@@ -50,12 +51,6 @@ def append_definition(value: EventDefinition) -> None:
     previous = EventDefinition.objects.filter(event_id=value.event_id).order_by("-version").first()
     value.version = previous.version + 1 if previous else 1
     value.observed_at = timezone.now()
-    if (
-        not isinstance(value.source_slugs, list)
-        or not 1 <= len(value.source_slugs) <= 10
-        or any(not isinstance(s, str) or s not in OFFICIAL_SOURCES for s in value.source_slugs)
-    ):
-        raise ValidationError("Choose 1–10 official feed IDs.")
     value.full_clean()
     value.save()
 
@@ -69,11 +64,22 @@ def sync_event_candidates() -> int:
             visible_evidence(now)
             .filter(item__source_id__in=definition.source_slugs)
             .exclude(eventevidence__definition=definition)
-            .order_by("-observed_at")[:100]
+            .order_by("-observed_at", "id")[:500]
         )
+        matched = 0
         for revision in revisions:
-            _, added = EventEvidence.objects.get_or_create(definition=definition, revision=revision)
+            discovery = discover(definition, revision)
+            if discovery is None:
+                continue
+            _, added = EventEvidence.objects.get_or_create(
+                definition=definition,
+                revision=revision,
+                defaults={"discovery": discovery, "discovery_priority": discovery["priority"]},
+            )
             created += int(added)
+            matched += 1
+            if matched >= 100:
+                break
     return created
 
 
@@ -117,14 +123,74 @@ def validate_review(value: EventEvidenceReview, *, lock: bool = False) -> None:
             "Select up to five distinct original paragraph numbers. / "
             "请选择最多五个不同的原文段落编号。"
         )
-    if value.relation == "DIRECT" and not numbers:
+    quote = value.feed_quote.strip()
+    if quote and (
+        len(quote) < 12
+        or not any(quote in text for text in (candidate.revision.title, candidate.revision.excerpt))
+    ):
         raise ValidationError(
-            "Direct relevance requires an original paragraph citation. / 直接相关必须选择原文段落。"
+            "Quote 12–1000 exact characters from the saved title or excerpt. / "
+            "请引用已保存标题或摘要中的 12–1000 个连续字符。"
+        )
+    value.feed_quote = quote
+    if value.relation == "DIRECT" and not (numbers or quote):
+        raise ValidationError(
+            "Direct relevance requires an original paragraph or exact feed quote. / "
+            "直接相关必须引用原文段落或订阅摘要。"
         )
     if not value.rationale.strip():
         raise ValidationError("Explain the relationship to this event. / 请说明与本事件的关系。")
     if value.relation not in EventEvidenceReview.Relation.values:
         raise ValidationError("Invalid relevance classification.")
+    if value.stance not in EventEvidenceReview.Stance.values:
+        raise ValidationError("Invalid outcome stance.")
+    if value.stance != "UNKNOWN" and (value.relation != "DIRECT" or not value.target_contract_id):
+        raise ValidationError(
+            "Support/opposition requires direct relevance and an explicit contract outcome. / "
+            "支持或反对必须直接相关并指定合约结果。"
+        )
+    if value.target_contract_id:
+        target = EventMarketLink.objects.get(pk=value.target_contract_id)
+        value.target_contract = target
+        if target.event_id != candidate.definition.event_id:
+            raise ValidationError("Choose a contract linked to this event. / 请选择本事件的合约。")
+        from quanthecy.markets.models import Market
+
+        market_query = Market.objects.select_for_update() if lock else Market.objects
+        market = market_query.get(pk=target.market_id)
+        if not contract_matches(target.snapshot, market.latest):
+            raise ValidationError(
+                "Contract rules or outcome changed since linking; "
+                "the saved target cannot support a new stance. / "
+                "合约规则或结果已变化，请先核查保存的合约范围。"
+            )
+
+
+def contract_matches(saved: dict[str, Any], current: dict[str, Any]) -> bool:
+    return (
+        bool(current)
+        and saved.get("outcome") == current.get("outcome")
+        and all(
+            saved.get("market", {}).get(key) == current.get("market", {}).get(key)
+            for key in ("id", "title", "resolution_rules", "rules_version", "closes_at")
+        )
+    )
+
+
+def review_value(value: EventEvidenceReview) -> EventReviewOut:
+    target = value.target_contract
+    return EventReviewOut(
+        id=value.id,
+        relation=cast(Literal["DIRECT", "BACKGROUND", "UNRELATED"], value.relation),
+        rationale=value.rationale,
+        paragraphs=value.paragraphs,
+        reviewed_at=value.reviewed_at,
+        feed_quote=value.feed_quote,
+        stance=cast(Literal["UNKNOWN", "SUPPORTS", "OPPOSES"], value.stance),
+        target_contract_id=value.target_contract_id,
+        target_market_id=target.market_id if target else None,
+        target_snapshot=target.snapshot if target else None,
+    )
 
 
 @transaction.atomic
@@ -188,8 +254,31 @@ def candidate_values(
     candidates = list(
         EventEvidence.objects.filter(definition=definition, id=Subquery(latest))
         .select_related("revision__item__source")
-        .defer("revision__raw_document")
-        .order_by("-revision__observed_at", "id")[:101]
+        .prefetch_related(
+            Prefetch(
+                "reviews",
+                queryset=EventEvidenceReview.objects.filter(reviewed_at__lte=at)
+                .select_related("target_contract")
+                .order_by("-reviewed_at", "-id")[:20],
+                to_attr="cutoff_reviews",
+            )
+        )
+        .defer("revision__raw_document", "revision__raw_feed_fields")
+        .annotate(
+            previous_revision_id=Subquery(
+                EvidenceRevision.objects.filter(
+                    item_id=OuterRef("revision__item_id"),
+                    version__lt=OuterRef("revision__version"),
+                    observed_at__lte=at,
+                )
+                .order_by("-version")
+                .values("id")[:1]
+            )
+        )
+        .order_by("-discovery_priority", "-revision__observed_at", "id")[:101]
+    )
+    previous_versions = EvidenceRevision.objects.defer("raw_document", "raw_feed_fields").in_bulk(
+        [c.previous_revision_id for c in candidates if c.previous_revision_id]
     )
     current_ids = set(
         visible_evidence(at)
@@ -201,9 +290,7 @@ def candidate_values(
         revision = candidate.revision
         if revision.published_at and revision.published_at > at:
             continue
-        reviews = list(
-            candidate.reviews.filter(reviewed_at__lte=at).order_by("-reviewed_at", "-id")[:20]
-        )
+        reviews = candidate.cutoff_reviews
         review = reviews[0] if reviews else None
         status = (
             "STALE" if revision.id not in current_ids else review.relation if review else "PENDING"
@@ -231,16 +318,21 @@ def candidate_values(
                 status=cast(
                     Literal["PENDING", "STALE", "DIRECT", "BACKGROUND", "UNRELATED"], status
                 ),
-                review=EventReviewOut.from_orm(review) if review else None,
+                review=review_value(review) if review else None,
                 passages=passages,
-                history=[EventReviewOut.from_orm(r) for r in reviews],
+                history=[review_value(r) for r in reviews],
                 matched_at=candidate.created_at,
+                discovery=candidate.discovery,
+                changes=revision_changes(
+                    revision, previous_versions.get(candidate.previous_revision_id)
+                ),
             )
         )
     order = {"DIRECT": 0, "BACKGROUND": 1, "PENDING": 2, "STALE": 3, "UNRELATED": 4}
     result.sort(
         key=lambda c: (
             order[c.status],
+            -c.discovery.get("priority", 0),
             -(c.evidence.published_at or c.evidence.observed_at).timestamp(),
             str(c.id),
         )
@@ -339,6 +431,12 @@ def event_detail(slug: str, cutoff: datetime | None) -> EventDetail:
             for s in ("PENDING", "STALE", "DIRECT", "BACKGROUND", "UNRELATED")
         },
         truncated=truncated,
+        official_direct_count=sum(
+            e.status == "DIRECT"
+            and e.evidence.source_kind == "OFFICIAL"
+            and bool(e.review and e.review.paragraphs)
+            for e in evidence
+        ),
     )
 
 

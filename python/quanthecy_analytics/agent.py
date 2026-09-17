@@ -38,6 +38,10 @@ Use only the frozen context; no browsing, extra tools or knowledge of later even
 Do not calculate new metrics. Numeric statements must agree with supplied metric references.
 Distinguish observations, hypotheses and supported explanations.
 Topic/timing alone is not causation.
+Explain saved evidence version changes, relevant support/opposition and unresolved gaps.
+Discovery priority is not impact. Outcome stance applies only when stance_applicable is true.
+Media excerpts are secondary sources. Removed text belongs to a previous version, and first
+body capture need not mean new information from the publisher. UNKNOWN is not opposition.
 Cite only reference IDs in the context, including for the thesis.
 key_signals contains signal IDs only.
 State missing evidence and conflicting findings.

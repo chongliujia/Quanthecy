@@ -63,7 +63,7 @@ Deploy Django migration `research.0002_official_documents` before the new worker
 
 ## Agent use and limits
 
-Agent `context-v5` uses the exact visible evidence-revision IDs. For each of at most
+Agent `context-v6` uses the exact visible evidence-revision IDs. For each of at most
 eight associated entries, RSS excerpts are bounded to 800 UTF-8 bytes and document
 passages to 1,800 bytes. At most three paragraphs are chosen by a deterministic
 count of policy terms, with original paragraph numbers, excerpt truncation and

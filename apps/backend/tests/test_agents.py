@@ -214,7 +214,7 @@ def test_risk_review_preserves_peer_limitations_and_never_retries_overflow(
         assert process_one(Event(), provider)
         assert not process_one(Event(), provider)
     run.refresh_from_db()
-    assert run.prompt_version == "research-team-v5"
+    assert run.prompt_version == "research-team-v6"
     assert run.reserved_calls == 5
     if risk_count <= 64:
         assert run.state == "SUCCEEDED", run.validation_errors

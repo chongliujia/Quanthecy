@@ -15,7 +15,7 @@ it('separates pending candidates from approvals and preserves exact evidence cut
   vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(data)))
   mount(<EventPages userId="u1" slug={event.slug} cutoff="" />)
   expect(await screen.findByText('October Fed decision')).toBeInTheDocument()
-  expect(screen.getByText(/No directly relevant evidence has been reviewed/)).toBeVisible()
+  expect(screen.getByText(/No directly relevant official body passages have been reviewed/)).toBeVisible()
   expect(screen.getByRole('link', { name: 'Fed statement' })).toHaveAttribute('href', `#/evidence/e1?cutoff=${encodeURIComponent(observed)}`)
   fireEvent.change(screen.getByLabelText('Relevance filter'), { target: { value: 'DIRECT' } })
   expect(screen.getByText('No evidence in this category.')).toBeVisible()
@@ -58,4 +58,24 @@ it('switches between evidence and changes without a long scroll', async () => {
   expect(screen.queryByRole('heading', { name: 'Evidence for this event' })).not.toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: 'Evidence for this event' }))
   expect(screen.getByRole('link', { name: 'Fed statement' })).toBeVisible()
+})
+
+it('keeps feed-only direct reviews separate from forecast evidence', async () => {
+  const review = { id: 'review1', relation: 'DIRECT', rationale: 'Conditional support.', paragraphs: [], reviewed_at: observed, stance: 'SUPPORTS', feed_quote: 'An exact excerpt from the feed.', target_snapshot: { market: { title: 'October rate cut?' }, outcome: { label: 'YES' } } }
+  const detail: EventDetail = { ...data, official_direct_count: 0, counts: { DIRECT: 1 }, evidence: [{ ...data.evidence[0], evidence: { ...evidence, source_kind: 'MEDIA' }, status: 'DIRECT', review, history: [review], discovery: { method: 'fed-macro-v1', reasons: ['US_MACRO_TERMS'], matches: [] } }] }
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(detail)))
+  mount(<EventPages userId="u1" slug={event.slug} cutoff="" />)
+  expect(await screen.findByText('Supports the selected outcome')).toBeVisible()
+  expect(screen.getByText('October rate cut? · YES')).toBeVisible()
+  expect(screen.getByText(/No directly relevant official body passages have been reviewed/)).toBeVisible()
+  fireEvent.click(screen.getByText('Why this is a candidate'))
+  expect(screen.getByText('US macroeconomic terms in saved text')).toBeVisible()
+})
+
+it('shows historical removals with a link to the previous version', () => {
+  mount(<FrozenEvidence reference={{ id: 'r1', kind: 'evidence', label: 'Fed', value: { evidence, version_changes: { kind: 'REVISION', previous_observed_at: '2026-09-15T10:00:00+00:00', changed_fields: ['document'], added: [], removed: [{ paragraph: 2, text: 'Old qualification.', truncated: false }] }, event_reviews: [{ event_slug: 'fed', review: { id: 'rev', relation: 'DIRECT', rationale: 'Saved judgment', stance: 'OPPOSES', stance_applicable: false } }] } }} />)
+  expect(screen.getByText('This saved stance does not apply to the current contract and rules.')).toBeVisible()
+  fireEvent.click(screen.getByText('What changed in this saved version'))
+  expect(screen.getByText('Removed from the current capture')).toBeVisible()
+  expect(screen.getByRole('link', { name: /Previous version/ })).toHaveAttribute('href', `#/evidence/e1?cutoff=${encodeURIComponent('2026-09-15T10:00:00+00:00')}&paragraph=2`)
 })

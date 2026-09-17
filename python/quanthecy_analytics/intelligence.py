@@ -19,7 +19,7 @@ from .report_validation import (
     parse_report,
 )
 
-VERSION = "research-team-v5"
+VERSION = "research-team-v6"
 Workflow = Literal["single", "team"]
 Language = Literal["zh", "en"]
 ShortText = Annotated[str, Field(min_length=1, max_length=600)]
@@ -34,7 +34,7 @@ class Skill:
     reference_kinds: tuple[str, ...]
     dependencies: tuple[str, ...] = ()
     checklist: tuple[str, ...] = ()
-    version: str = "1.4.0"
+    version: str = "1.5.0"
 
 
 SKILLS = (
@@ -62,6 +62,8 @@ SKILLS = (
             "Check whether a source directly supports the contract outcome or only shares a topic.",
             "Separate confirmed facts, conditional catalysts and unsupported causal explanations.",
             "Report contradicting sources when present; absence of evidence is not contradiction.",
+            "Explain saved version changes, outcome-specific support/opposition, "
+            "and the missing evidence needed to revise the judgment.",
         ),
     ),
     Skill(
@@ -121,6 +123,13 @@ Peer conclusions are hypotheses, not independent sources or ground truth.
 Event reviews apply only to their exact document and event-scope revisions. DIRECT means
 relevant to the event, not support for YES or proof of causation. Use cited paragraph numbers
 and preserve qualifications. Background evidence alone cannot justify a probability estimate.
+Discovery reasons and priority are matching rules, not relevance approval or probability.
+Media feed quotes are secondary excerpts, not complete articles or independent corroboration.
+SUPPORTS/OPPOSES applies only to the saved target outcome when stance_applicable is true;
+otherwise treat the direction as inapplicable to this contract. UNKNOWN is not opposition.
+version_changes compares saved document versions, not the user's previous report. Added text
+may be a first body capture, not a new publisher statement. Removed text is historical, not
+current evidence; use its previous revision ID/time for provenance, never infer price impact.
 Cite source reference IDs, never peer IDs. Do not invent sources or future facts.
 Do not compute new numerical metrics. Preserve probability source/basis and units.
 Do not place trades, recommend position sizes or assert guaranteed returns.
@@ -352,7 +361,7 @@ def validate_stage(
         ]
         if report.forecast.status == "ESTIMATE":
             evidence = {r["id"] for r in context["references"] if r["kind"] == "evidence"}
-            if context.get("version") == "context-v5":
+            if context.get("version") in {"context-v5", "context-v6"}:
                 evidence &= set(context.get("quality", {}).get("reviewed_evidence_ids", []))
             if not context.get("quality", {}).get("forecast_eligible") or not evidence.intersection(
                 report.forecast.rationale.references

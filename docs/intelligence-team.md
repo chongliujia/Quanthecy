@@ -28,10 +28,11 @@ the organization-scoped `GET /agent/skills` endpoint.
 
 ## Context and working memory
 
-`context-v5` additionally includes bounded passages from captured official documents,
+`context-v6` additionally includes bounded passages from captured official documents,
 using the exact evidence version known at the cutoff. See
 [official-evidence.md](official-evidence.md) for source restrictions, paragraph
-selection, versioning and limits. Old run contexts remain immutable.
+selection, versioning and limits. Old run contexts remain immutable. Version 6 adds saved-version changes and contract-specific
+review stances; see [event-evidence.md](event-evidence.md).
 
 1. Freeze observations known at the research cutoff, the last 20-minute analytical
    window, contract rules, deterministic metrics, signals, up to eight associated
@@ -81,7 +82,7 @@ feature, separate from this initial inference workflow.
 
 ## Report format compatibility and diagnostics
 
-`research-team-v5` / skills `1.4.0` keep the 600-character specialist claim limit
+`research-team-v6` / skills `1.5.0` retain the 600-character specialist claim limit
 consistent between prompts, schemas and validation. All specialists now allow
 twelve limitation groups; the previous four-item cap for independent specialists
 caused the September 16 event-intelligence failure despite adequate output tokens.

@@ -313,3 +313,197 @@ def test_admin_binds_review_to_preview_even_if_candidate_post_is_tampered(candid
     )
     assert invalid.status_code == 200
     assert invalid.context["review_candidate"].pk == candidate.pk
+
+
+def expand(event, sources=None):
+    previous = event.definitions.latest("version")
+    value = EventDefinition(
+        event=event,
+        title=previous.title,
+        scope=previous.scope,
+        starts_on=previous.starts_on,
+        ends_on=previous.ends_on,
+        calendar_url=URL,
+        source_slugs=sources or ["fed-monetary", "bbc-business", "bea-releases"],
+        discovery_policy="fed-macro-v1",
+    )
+    append_definition(value)
+    return value
+
+
+def test_content_discovery_rejects_unrelated_and_old_items(event):
+    from quanthecy.research.discovery import discover
+
+    definition = expand(event)
+    source = EvidenceSource.objects.create(slug="bbc-business", name="BBC", url=URL)
+    item = EvidenceItem.objects.create(source=source, external_id="macro")
+    value = EvidenceRevision(
+        item=item,
+        version=1,
+        title="Federal Reserve interest rates in October 2026",
+        excerpt="US inflation report",
+        published_at=timezone.make_aware(datetime(2026, 9, 1)),
+    )
+    result = discover(definition, value)
+    assert result["priority"] == 30
+    assert "EVENT_MONTH_MENTION" in result["reasons"]
+    assert result["matches"][0]["text"] == value.title
+    value.title, value.excerpt = "A technology launch", "International business"
+    assert discover(definition, value) is None
+    value.title = "UK inflation rises"
+    assert discover(definition, value) is None
+    value.title = "US inflation rises"
+    assert discover(definition, value)["priority"] == 10
+    value.published_at = timezone.make_aware(datetime(2025, 1, 1))
+    assert discover(definition, value) is None
+    value.published_at = None
+    assert "PUBLICATION_UNKNOWN" in discover(definition, value)["reasons"]
+
+
+def test_content_policy_is_explicit_and_old_scope_remains(event, candidate):
+    from quanthecy.research.feeds import FeedEntry
+    from quanthecy.research.news import persist_entry
+
+    definition = expand(event)
+    source = EvidenceSource.objects.create(slug="bbc-business", name="BBC", url=URL)
+    saved = persist_entry(
+        source,
+        FeedEntry(
+            "bbc",
+            "Federal Reserve interest rates",
+            "US inflation outlook",
+            "https://www.bbc.com/news/example",
+            timezone.now() - timedelta(days=1),
+        ),
+    )
+    assert sync_event_candidates() >= 1
+    match = EventEvidence.objects.get(definition=definition, revision__item=saved)
+    assert match.discovery_priority == 20 and match.discovery["matches"]
+    assert match.reviews.count() == 0
+    assert candidate.definition.discovery_policy == "source-only-v1"
+    assert sync_event_candidates() == 0
+
+
+def make_market_history(event):
+    rows = json.loads(
+        (Path(__file__).resolve().parents[3] / "tests/fixtures/research-window.json").read_text()
+    )
+    now = timezone.now() - timedelta(seconds=2)
+    shift = now - datetime.fromisoformat(rows[-1]["recorded_at"])
+    for row in rows:
+        for key in ("received_at", "recorded_at"):
+            row[key] = (datetime.fromisoformat(row[key]) + shift).isoformat()
+        row["probability"]["as_of"] = row["received_at"]
+        row["market"]["closes_at"] = (now + timedelta(days=30)).isoformat()
+    with transaction.atomic():
+        reconcile(rows[-1], analyze(rows)[0])
+    market = Market.objects.get()
+    link = EventMarketLink.objects.create(event=event, market=market, snapshot=snapshot(market))
+    repo = Mock()
+    repo.history.return_value = rows
+    return market, link, repo
+
+
+def test_media_quote_and_stance_are_preserved_but_cannot_unlock_forecast(event, operator):
+    definition = expand(event)
+    source = EvidenceSource.objects.create(slug="bbc-business", name="BBC", url=URL)
+    item = EvidenceItem.objects.create(source=source, external_id="media")
+    value = EvidenceRevision.objects.create(
+        item=item,
+        version=1,
+        title="Federal Reserve interest rate outlook",
+        excerpt="US inflation slowed according to a report.",
+        url="https://www.bbc.com/news/example",
+        content_hash="d" * 64,
+        published_at=timezone.now() - timedelta(days=1),
+    )
+    sync_event_candidates()
+    candidate = EventEvidence.objects.get(definition=definition, revision=value)
+    market, target, repo = make_market_history(event)
+    reviewed = EventEvidenceReview(
+        candidate=candidate,
+        relation="DIRECT",
+        feed_quote=value.excerpt,
+        stance="SUPPORTS",
+        target_contract=target,
+        rationale="Conditional support for this saved outcome only.",
+        paragraphs=[],
+        reviewed_by=operator,
+    )
+    append_evidence_review(reviewed)
+    data = event_detail(event.slug, None)
+    assert data.counts["DIRECT"] == 1 and data.official_direct_count == 0
+    assert data.evidence[0].review.stance == "SUPPORTS"
+    with patch("quanthecy.agents.context.history_repository", return_value=repo):
+        context = build_context(market.pk, timezone.now())
+        assert not context["quality"]["forecast_eligible"]
+        ref = next(r for r in context["references"] if r["kind"] == "evidence")
+        saved = ref["value"]["event_reviews"][0]["review"]
+        assert saved["stance_applicable"] and saved["feed_quote"] == value.excerpt
+        repo.history.return_value[-1]["market"]["resolution_rules"] = "Changed rules"
+        changed = build_context(market.pk, timezone.now())
+        ref = next(r for r in changed["references"] if r["kind"] == "evidence")
+        assert not ref["value"]["event_reviews"][0]["review"]["stance_applicable"]
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"stance": "SUPPORTS"},
+        {"feed_quote": "This quote was invented entirely."},
+        {"stance": "INVALID"},
+    ],
+)
+def test_review_rejects_unbound_direction_or_invented_quote(candidate, operator, changes):
+    value = EventEvidenceReview(
+        candidate=candidate,
+        relation="DIRECT",
+        paragraphs=[2],
+        rationale="Review",
+        reviewed_by=operator,
+        **changes,
+    )
+    with pytest.raises(ValidationError):
+        append_evidence_review(value)
+
+
+def test_stance_cannot_target_another_event_or_changed_rules(event, candidate, operator):
+    market, target, _ = make_market_history(event)
+    other = ResearchEvent.objects.create(slug="other-event", topic=event.topic)
+    wrong = EventMarketLink.objects.create(event=other, market=market, snapshot=target.snapshot)
+    value = EventEvidenceReview(
+        candidate=candidate,
+        relation="DIRECT",
+        paragraphs=[2],
+        rationale="Review",
+        reviewed_by=operator,
+        stance="OPPOSES",
+        target_contract=wrong,
+    )
+    with pytest.raises(ValidationError, match="linked to this event"):
+        append_evidence_review(value)
+    value.target_contract = target
+    market.latest["market"]["resolution_rules"] = "Changed"
+    market.save()
+    with pytest.raises(ValidationError, match="rules or outcome changed"):
+        append_evidence_review(value)
+
+
+def test_saved_version_changes_are_cutoff_safe_and_distinguish_capture(event, candidate):
+    before = timezone.now()
+    previous = candidate.revision
+    new = revision(previous.item, 2)
+    body = new.document.copy()
+    body["text"] = (
+        "A new policy paragraph with updated qualifications. " * 3
+        + "\n\nThis release concerns July only."
+    )
+    EvidenceRevision.objects.filter(pk=new.pk).update(document=body, excerpt="Changed excerpt")
+    sync_event_candidates()
+    data = event_detail(event.slug, None).evidence[0].changes
+    assert data["previous_revision_id"] == str(previous.id)
+    assert data["added"][0]["paragraph"] == 1
+    assert data["removed"][0]["paragraph"] == 1
+    assert {"excerpt", "document"} <= set(data["changed_fields"])
+    earlier = event_detail(event.slug, before).evidence[0].changes
+    assert earlier["kind"] == "FIRST_OBSERVED" and not earlier["added"]

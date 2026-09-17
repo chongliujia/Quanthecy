@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from ninja import Schema
@@ -40,6 +40,11 @@ class EventReviewOut(Schema):
     rationale: str
     paragraphs: list[int]
     reviewed_at: datetime
+    feed_quote: str = ""
+    stance: Literal["UNKNOWN", "SUPPORTS", "OPPOSES"] = "UNKNOWN"
+    target_contract_id: UUID | None = None
+    target_market_id: UUID | None = None
+    target_snapshot: dict[str, Any] | None = None
 
 
 class Passage(Schema):
@@ -56,6 +61,8 @@ class EventEvidenceOut(Schema):
     passages: list[Passage]
     history: list[EventReviewOut]
     matched_at: datetime
+    discovery: dict[str, Any] = {}
+    changes: dict[str, Any] = {}
 
 
 class EventChange(Schema):
@@ -79,3 +86,4 @@ class EventDetail(Schema):
     changes: list[EventChange]
     counts: dict[str, int]
     truncated: bool
+    official_direct_count: int = 0

@@ -10,7 +10,8 @@ from quanthecy_analytics.signals import analyze
 
 from quanthecy.markets.repositories import history_repository
 from quanthecy.research.documents import OfficialDocument, evidence_passages
-from quanthecy.research.events import event_list, market_event_evidence
+from quanthecy.research.events import contract_matches, event_list, market_event_evidence
+from quanthecy.research.evidence_changes import revision_changes
 from quanthecy.research.models import EvidenceRevision
 from quanthecy.research.schemas import EvidenceOut, LinkOut, TimelineEntry
 from quanthecy.research.services import comparisons, timeline
@@ -153,6 +154,41 @@ def build_context(market_id: UUID, cutoff: datetime) -> dict[str, Any]:
         value["evidence"]["excerpt"] = excerpt
         value["evidence"]["excerpt_truncated"] = excerpt != entry.evidence.excerpt
         revision = evidence_versions.get(entry.evidence.revision_id)
+        if revision:
+            previous = (
+                EvidenceRevision.objects.filter(
+                    item_id=revision.item_id, version__lt=revision.version, observed_at__lte=cutoff
+                )
+                .defer("raw_document", "raw_feed_fields")
+                .order_by("-version")
+                .first()
+            )
+            value["version_changes"] = revision_changes(revision, previous)
+            changes = value["version_changes"]
+            for key in ("added", "removed"):
+                if len(changes[key]) > 1:
+                    changes["truncated"] = True
+                changes[key] = changes[key][:1]
+                for passage in changes[key]:
+                    text = passage["text"].encode()[:300].decode("utf-8", errors="ignore")
+                    passage["truncated"] = passage["truncated"] or text != passage["text"]
+                    passage["text"] = text
+        discoveries = [
+            v
+            for v in event_evidence
+            if v["candidate"]["evidence"]["revision_id"] == str(entry.evidence.revision_id)
+        ][:2]
+        if discoveries:
+            value["event_discovery"] = [
+                {
+                    "event_slug": v["event"]["slug"],
+                    "definition_id": v["event"]["definition_id"],
+                    "method": v["candidate"]["discovery"].get("method", "source-only-v1"),
+                    "reasons": v["candidate"]["discovery"].get("reasons", []),
+                    "review_status": v["candidate"]["status"],
+                }
+                for v in discoveries
+            ]
         if revision and revision.document:
             document = OfficialDocument.model_validate(revision.document)
             if revision.observed_at <= cutoff and document.observed_at <= cutoff:
@@ -171,6 +207,21 @@ def build_context(market_id: UUID, cutoff: datetime) -> dict[str, Any]:
                 }
                 for v in event_reviews
             ]
+            for event_review in value["event_reviews"]:
+                review = event_review["review"]
+                target = review.pop("target_snapshot", None)
+                review["stance_applicable"] = bool(
+                    review.get("target_market_id") == str(market_id)
+                    and target
+                    and contract_matches(target, latest)
+                )
+                if target:
+                    review["target"] = {
+                        "market_id": review["target_market_id"],
+                        "title": target["market"]["title"],
+                        "outcome": target["outcome"],
+                        "rules_version": target["market"]["rules_version"],
+                    }
             if revision and revision.document:
                 paragraphs = OfficialDocument.model_validate(revision.document).text.split("\n\n")
                 numbers = list(
@@ -190,7 +241,15 @@ def build_context(market_id: UUID, cutoff: datetime) -> dict[str, Any]:
                         "passages": passages,
                         "selection_truncated": True,
                     }
-            if any(v["candidate"]["status"] == "DIRECT" for v in event_reviews):
+            if (
+                revision
+                and revision.document
+                and entry.evidence.source_kind == "OFFICIAL"
+                and any(
+                    v["candidate"]["status"] == "DIRECT" and v["candidate"]["review"]["paragraphs"]
+                    for v in event_reviews
+                )
+            ):
                 direct_ids.append(str(entry.evidence.revision_id))
         references.append(
             {
@@ -259,7 +318,7 @@ def build_context(market_id: UUID, cutoff: datetime) -> dict[str, Any]:
         ),
     }
     context = {
-        "version": "context-v5",
+        "version": "context-v6",
         "cutoff": cutoff.isoformat(),
         "references": references,
         "limitations": limitations,

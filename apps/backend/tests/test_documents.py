@@ -290,7 +290,7 @@ def test_agent_document_passages_use_exact_visible_revision_and_remain_bounded(i
     old_ref = next(r for r in old["references"] if r["kind"] == "evidence")
     new_ref = next(r for r in new["references"] if r["kind"] == "evidence")
     assert "document_selection" not in old_ref["value"]
-    assert new_ref["id"] == str(revision.id) and new["version"] == "context-v5"
+    assert new_ref["id"] == str(revision.id) and new["version"] == "context-v6"
     selection = new_ref["value"]["document_selection"]
     assert selection["partial"]
     assert sum(len(p["text"].encode()) for p in selection["passages"]) <= 1800

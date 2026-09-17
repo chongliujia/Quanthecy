@@ -144,8 +144,9 @@ def poll_one_source() -> bool:
     try:
         data, etag, modified = fetch_feed(
             source.slug,
-            etag=source.etag,
-            last_modified=source.last_modified,
+            # Existing sources upgraded before counters existed need one full body.
+            etag=source.etag if source.last_entry_count else "",
+            last_modified=source.last_modified if source.last_entry_count else "",
             proxy=settings.NEWS_PROXY_URL,
         )
         parsed = parse_feed_result(data, source.slug) if data is not None else None

@@ -56,6 +56,7 @@ class SelectionForm(forms.ModelForm):
             "enabled": ("Collection enabled", "启用采集"),
             "is_public": ("Show in the market explorer", "在用户市场页展示主题"),
             "topic": ("Research topic", "研究主题"),
+            "tier": ("Collection tier", "采集层级"),
             "platform": ("Exchange", "交易所"),
             "exchange_id": ("Exchange market ID / ticker", "交易所市场 ID / 合约代码"),
             "label": ("Market label", "市场名称"),
@@ -64,6 +65,12 @@ class SelectionForm(forms.ModelForm):
         for name, pair in labels.items():
             if name in self.fields:
                 self.fields[name].label = label(*pair)
+        tier = self.fields.get("tier")
+        if isinstance(tier, forms.ChoiceField):
+            tier.choices = [
+                ("priority", label("Priority", "重点")),
+                ("standard", label("Standard", "普通")),
+            ]
         if "enabled" in self.fields:
             self.fields["enabled"].help_text = label(
                 "Pausing stops collection for this membership. Other topics may still collect "
@@ -122,7 +129,7 @@ class ResearchTopicAdmin(SelectionAdmin):
 
 @admin.register(CollectionTarget)
 class CollectionTargetAdmin(SelectionAdmin):
-    list_display = ("label", "topic", "platform", "exchange_id", "enabled", "updated_at")
-    list_filter = ("topic", "platform", "enabled")
+    list_display = ("label", "topic", "platform", "exchange_id", "tier", "enabled", "updated_at")
+    list_filter = ("topic", "platform", "enabled", "tier")
     search_fields = ("label", "exchange_id")
     list_select_related = ("topic",)

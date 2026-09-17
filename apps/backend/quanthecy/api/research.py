@@ -7,8 +7,8 @@ from ninja import Query, Router
 
 from quanthecy.markets.topic_schemas import TopicCoverage
 from quanthecy.markets.topics import public_topics
-from quanthecy.research import events, services
-from quanthecy.research.event_schemas import EventDetail, EventSummary
+from quanthecy.research import event_charts, events, services
+from quanthecy.research.event_schemas import EventChart, EventDetail, EventSummary
 from quanthecy.research.schemas import (
     ComparisonDetail,
     EvidenceDetail,
@@ -99,3 +99,15 @@ def research_events(
 @router.get("/research/events/{slug}", response=EventDetail)
 def research_event(request: HttpRequest, slug: str, cutoff: datetime | None = None) -> EventDetail:
     return events.event_detail(slug, cutoff)
+
+
+@router.get("/research/events/{slug}/chart", response=EventChart)
+def research_event_chart(
+    request: HttpRequest,
+    slug: str,
+    cutoff: datetime | None = None,
+    hours: int = Query(24, ge=1, le=24),
+    platform: Literal["", "polymarket", "kalshi"] = "",
+    market_ids: str = Query("", max_length=221),
+) -> EventChart:
+    return event_charts.event_chart(slug, cutoff, hours, platform, market_ids)

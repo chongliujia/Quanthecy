@@ -23,9 +23,18 @@ from .schemas import HistoryPage, MarketDetail, MarketPage, MarketSummary, Signa
 
 
 def list_markets(
-    *, platform: str | None, search: str, sort: str, offset: int, limit: int, topic: str = ""
+    *,
+    platform: str | None,
+    search: str,
+    sort: str,
+    offset: int,
+    limit: int,
+    topic: str = "",
+    market_ids: list[UUID] | None = None,
 ) -> MarketPage:
     query = Market.objects.all()
+    if market_ids is not None:
+        query = query.filter(id__in=market_ids)
     if topic:
         from .topics import topic_market_ids
 

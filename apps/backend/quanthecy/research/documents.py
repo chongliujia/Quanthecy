@@ -179,7 +179,14 @@ def revision_hash(values: dict[str, object]) -> str:
 def persist_document(
     item_id: UUID, lease: UUID, expected_url: str, document: OfficialDocument, raw: str
 ) -> bool:
+    # Match feed/configuration lock ordering: source, then item.
+    from .models import EvidenceSource
+
+    source_id = EvidenceItem.objects.values_list("source_id", flat=True).get(pk=item_id)
+    source = EvidenceSource.objects.select_for_update().get(pk=source_id)
     item = EvidenceItem.objects.select_for_update().get(pk=item_id)
+    if not source.enabled:
+        return False
     if item.document_lease != lease:
         return False
     previous = item.revisions.order_by("-version").first()

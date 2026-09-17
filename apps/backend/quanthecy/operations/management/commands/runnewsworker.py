@@ -8,6 +8,7 @@ from typing import Any
 from django.core.management.base import BaseCommand
 from django.db import close_old_connections
 
+from quanthecy.operations.heartbeats import news_heartbeat
 from quanthecy.research.documents import poll_one_document
 from quanthecy.research.events import sync_event_candidates
 from quanthecy.research.news import associate_topics, initialize_sources, poll_one_source
@@ -40,6 +41,7 @@ class Command(BaseCommand):
                         poll_one_document()
                     sync_event_candidates()
                     HEARTBEAT.touch()
+                    news_heartbeat(publish=True)
                 except Exception:
                     logger.exception("News worker cycle failed")
                     HEARTBEAT.unlink(missing_ok=True)

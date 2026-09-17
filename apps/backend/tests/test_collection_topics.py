@@ -125,6 +125,7 @@ def test_operator_form_audits_atomic_changes_and_viewer_cannot_edit(topic):
         "exchange_id": row.exchange_id,
         "label": row.label,
         "rationale": row.rationale,
+        "tier": row.tier,
         "change_reason": "Pause this market",
     }
     url = reverse("admin:markets_collectiontarget_change", args=[row.id])

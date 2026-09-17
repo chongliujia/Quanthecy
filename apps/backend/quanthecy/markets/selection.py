@@ -58,9 +58,9 @@ def validate_candidate(candidate: ResearchTopic | CollectionTarget | None = None
             tr("At most 50 research topics are supported.", "最多支持 50 个研究主题。")
         )
     targets = list(
-        CollectionTarget.objects.values("id", "topic_id", "platform", "exchange_id", "enabled")[
-            :1001
-        ]
+        CollectionTarget.objects.values(
+            "id", "topic_id", "platform", "exchange_id", "enabled", "tier"
+        )[:1001]
     )
     if isinstance(candidate, CollectionTarget):
         targets = [row for row in targets if row["id"] != candidate.pk]
@@ -71,6 +71,7 @@ def validate_candidate(candidate: ResearchTopic | CollectionTarget | None = None
                 "platform": candidate.platform,
                 "exchange_id": candidate.exchange_id,
                 "enabled": candidate.enabled,
+                "tier": candidate.tier,
             }
         )
     if len(targets) > 1000:
@@ -81,15 +82,21 @@ def validate_candidate(candidate: ResearchTopic | CollectionTarget | None = None
             )
         )
     selected: dict[str, set[str]] = {platform: set() for platform in PLATFORMS}
+    priority: dict[str, set[str]] = {platform: set() for platform in PLATFORMS}
     for row in targets:
         if row["enabled"] and topics.get(row["topic_id"]):
             validate_exchange_id(row["platform"], row["exchange_id"])
             selected[row["platform"]].add(row["exchange_id"])
-    if any(len(ids) > 50 for ids in selected.values()):
+            if row["tier"] == "priority":
+                priority[row["platform"]].add(row["exchange_id"])
+    if any(len(ids) > 50 for ids in priority.values()) or any(
+        len(ids) > 250 for ids in selected.values()
+    ):
         raise ValidationError(
             tr(
-                "Each exchange allows at most 50 enabled unique markets. Pause a target first.",
-                "每个交易所最多启用 50 个不同市场，请先暂停其他采集目标。",
+                "Each exchange allows 50 priority markets and 250 total targets. "
+                "Pause or lower a tier first.",
+                "每个交易所最多 50 个重点市场、250 个采集目标，请先暂停或降低采集层级。",
             )
         )
 
@@ -111,25 +118,53 @@ def record_change(
 def manifest(plan: CollectionPlan) -> dict[str, Any]:
     validate_candidate()
     universe: dict[str, list[str]] = {platform: [] for platform in PLATFORMS}
-    for platform, exchange_id in (
-        CollectionTarget.objects.filter(enabled=True, topic__enabled=True)
-        .values_list("platform", "exchange_id")
-        .order_by("platform", "exchange_id")
-        .distinct()
-    ):
-        universe[platform].append(exchange_id)
+    intervals: dict[str, dict[str, int]] = {platform: {} for platform in PLATFORMS}
+    targets = CollectionTarget.objects.filter(enabled=True, topic__enabled=True)
+    tiered = plan.coverage_managed or targets.filter(tier="standard").exists()
+    for target in targets.order_by("platform", "exchange_id"):
+        interval = getattr(plan, f"{target.platform}_interval_seconds")
+        if target.tier == "standard":
+            interval = max(interval, plan.standard_interval_seconds)
+        previous = intervals[target.platform].get(target.exchange_id, interval)
+        intervals[target.platform][target.exchange_id] = min(previous, interval)
+    for platform in PLATFORMS:
+        universe[platform] = sorted(intervals[platform])
     return {
-        "schema_version": 1,
+        "schema_version": 3 if tiered else 2 if plan.controls_managed else 1,
         "revision": plan.revision,
         "enabled": plan.managed,
         "universe": universe,
+        **({"sources": source_controls(plan)} if plan.controls_managed or tiered else {}),
+        **(
+            {
+                "intervals": intervals,
+                "discovery": {
+                    "enabled": plan.catalog_enabled,
+                    "interval_seconds": plan.catalog_interval_seconds,
+                    "page_interval_seconds": plan.catalog_page_interval_seconds,
+                    "max_pages": plan.catalog_max_pages,
+                },
+            }
+            if tiered
+            else {}
+        ),
+    }
+
+
+def source_controls(plan: CollectionPlan) -> dict[str, dict[str, Any]]:
+    return {
+        platform: {
+            "enabled": getattr(plan, f"{platform}_enabled"),
+            "interval_seconds": getattr(plan, f"{platform}_interval_seconds"),
+        }
+        for platform in PLATFORMS
     }
 
 
 @transaction.atomic
 def publish_selection() -> None:
     plan = lock_plan()
-    if not plan.managed:
+    if not plan.managed and not plan.controls_managed:
         return  # Uninitialized installs retain their existing collector discovery/configuration.
     payload = manifest(plan)
     with Redis.from_url(
@@ -142,6 +177,8 @@ def selection_status() -> dict[str, Any]:
     plan = CollectionPlan.objects.filter(pk=PLAN_ID).first()
     state: dict[str, Any] = {
         "managed": bool(plan and plan.managed),
+        "controls_managed": bool(plan and plan.controls_managed),
+        "sources": source_controls(plan) if plan and plan.controls_managed else {},
         "desired_revision": plan.revision if plan else None,
         "applied_revision": None,
         "checked_at": None,
@@ -163,9 +200,11 @@ def selection_status() -> dict[str, Any]:
         state.update(applied_revision=value["revision"], checked_at=at)
         state["applied"] = bool(
             plan
-            and plan.managed
-            and value.get("enabled") is True
+            and (plan.managed or plan.controls_managed)
+            and value.get("enabled") == plan.managed
             and value["revision"] == plan.revision
+            and (not plan.controls_managed or value.get("schema_version") in (2, 3))
+            and (not plan.coverage_managed or value.get("schema_version") == 3)
         )
     except (OSError, ValueError, TypeError, KeyError, AttributeError):
         pass

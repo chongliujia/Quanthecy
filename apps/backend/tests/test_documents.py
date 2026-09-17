@@ -297,3 +297,20 @@ def test_agent_document_passages_use_exact_visible_revision_and_remain_bounded(i
     assert new_ref["value"]["association"]["status"] == "TOPIC_ONLY"
     doc, _ = extract_document(item.source_id, URL, html("通胀政策" * 1000))
     assert sum(len(p["text"].encode()) for p in evidence_passages(doc)["passages"]) <= 1800
+
+
+def test_document_response_cannot_publish_after_pause_or_frequency_edit(item):
+    from quanthecy.accounts.models import User
+    from quanthecy.research.source_controls import configure_source
+
+    operator = User.objects.create_superuser("doc-control@example.com", "test")
+    for enabled in (False, True):
+        # Start a request, then change its source configuration before it returns.
+        lease = uuid4()
+        EvidenceItem.objects.filter(pk=item.pk).update(document_lease=lease)
+        document, raw = extract_document(item.source_id, URL, html())
+        configure_source(
+            item.source_id, enabled=enabled, interval=600, reason="Update source", actor=operator
+        )
+        assert not persist_document(item.pk, lease, URL, document, raw)
+        assert item.revisions.count() == 1

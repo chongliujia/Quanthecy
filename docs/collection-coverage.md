@@ -11,7 +11,7 @@ Operators curate a bounded set of exact exchange market IDs in Django Admin. The
 
 Disabling a target or topic retains all market metadata, raw payloads, and history. A market included in multiple enabled topics is collected once; disabling one membership does not pause the other. Deletion is deliberately unavailable for these configuration records.
 
-The initial bounds are 50 topics, 1,000 saved memberships, and 50 unique enabled markets per exchange. Concurrent admin edits and plan publication share a PostgreSQL row lock, so their effective union is validated atomically. Long or failing exchange requests can still exceed the sampling budget; freshness and continuity gates remain authoritative.
+The initial bounds are 50 topics, 1,000 saved memberships, and 50 priority / 250 total enabled unique markets per exchange. Concurrent admin edits and plan publication share a PostgreSQL row lock, so their effective union is validated atomically. Long or failing exchange requests can still exceed the sampling budget; freshness and continuity gates remain authoritative.
 
 ## Activation
 
@@ -33,10 +33,10 @@ Before first activation, verify that the collector's `/status` universe has been
 
 - PostgreSQL owns `ResearchTopic`, `CollectionTarget`, and the singleton `CollectionPlan` revision.
 - The analytics worker republishes the complete desired selection to Redis `collector:selection:v1` every worker iteration (normally 10 seconds), with a 300-second TTL. Publication does not depend on ClickHouse being available.
-- Rust reads the selection at a cycle boundary after replaying any pending durable batch. It validates schema, platforms, revision, exact ID syntax, deduplication, and bounds before saving it into the locked collector journal.
+- Rust reads the selection while idle (every five seconds), at cycle boundaries before replaying pending batches, and between market requests. It validates schema, platforms, revision, exact ID syntax, deduplication, and bounds before saving it into the locked collector journal.
 - Missing/invalid Redis data or a Redis outage retains the last valid configuration, including across collector restarts. Lower revisions and conflicting content at the same revision are rejected. Redis is not configuration truth.
 - An enabled managed plan with empty platform lists intentionally pauses those platforms; it must not fall back to automatic discovery. Startup environment selection only applies in legacy mode.
-- The acknowledgement key `collector:selection-status:v1` expires after 300 seconds; the console trusts an acknowledgement only for 180 seconds and only when its enabled revision equals the desired revision. The current deployment assumes one collector with one durable spool.
+- The acknowledgement key `collector:selection-status:v1` expires after 300 seconds; the console trusts an acknowledgement only for 180 seconds and only when its selection mode and revision equal the desired configuration. Runtime controls require schema version 2 or 3; directory controls require version 3. The current deployment assumes one collector with one durable spool.
 - Restoring PostgreSQL to an older revision requires reconciling it with the retained journal before resuming changes. Do not clear the spool, because it also contains durable pending observations.
 
 ## Coverage semantics
@@ -57,3 +57,16 @@ New targets have no invented historical backfill. The quality policy requires at
 ## Verification
 
 Coverage tests exercise permissions and bilingual views, private-topic filtering, missing targets, deduplicated membership, activation limits, audited pause operations, invalid-edit rollback, idempotent imports preserving old coverage, and stale/mismatched acknowledgements. Rust tests cover revision conflicts, input bounds, explicit empty plans, durable restart recovery, and compatibility with old journals. The React test checks topic filtering and visible coverage gaps.
+
+## Processing diagnostics and service recovery
+
+The header and collection-health console now distinguish acknowledged pauses,
+pending configuration, missing collector heartbeats, request failures and delayed
+observations. They also report the analytics worker heartbeat used by in-app alerts.
+Use [collection controls](collection-controls.md) to pause/resume each exchange and edit polling intervals without stopping containers. A manually stopped container still needs deployment recovery. See the
+[watchlist operations guide](watchlists-alerts.md#collection-and-processing-state)
+for recovery commands and the difference between liveness and data eligibility.
+
+## Directory expansion
+
+Use [market discovery and collection tiers](market-directory.md) to browse exchange catalogs, batch-select targets and lower polling frequency for standard or settled markets. Directory metadata is separate from observed price history.

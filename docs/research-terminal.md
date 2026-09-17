@@ -12,16 +12,25 @@ embedded.
 
 ## Using the terminal
 
-Open **Market explorer**, then select a contract. The desktop layout gives the
-probability chart the primary column and shows one searchable market list on the
-right. The bottom Signals / News / Related markets / Data area expands on demand.
-The list shows up to 40 results and is not a saved watchlist. Below 1100px it is
-replaced by **Switch market**. **Research & agent** and event selection open a
-readable inspector drawer; Escape closes it and returns focus to the page.
+Open **Market explorer**, then select a contract. On desktop, the market table
+scrolls below its fixed filters and above pagination. Above 1100px, the desktop terminal
+fits the available window height. A compact quote strip sits above the main chart;
+the right panel switches between **Markets** and **Research**. News, signals and
+research content scroll within their own panels, keeping chart controls and activity
+tabs visible. Exceptionally short windows, expanded context and enlarged text can
+still scroll instead of clipping content. Smaller screens use a single column.
 
-The navigation rail can collapse. Drag the separator above the activity tabs to
-resize the chart, or use arrow keys, Home/End, and double-click reset. Chart height
-and navigation preferences persist locally per user, without storing credentials.
+The searchable market list shows up to 40 results and is not a saved watchlist.
+**Research & agent** and event selection open the inline research panel on desktop;
+the expand button opens a wider drawer. Agent research opens in the wider drawer
+so multi-expert reports stay readable. Below 1100px, use **Switch market** and the
+research drawer. Escape closes a drawer and returns focus to the research trigger.
+
+The navigation rail and side panel can collapse. Drag the vertical separator to
+resize the side panel. Open a bottom activity tab, then drag its upper separator
+to allocate space between the chart and activity. Separators also support arrow
+keys, Home/End and double-click reset. Panel sizes and visibility persist locally
+per user, without storing credentials; viewport limits keep the chart usable.
 
 Use **中文 / English** in the top bar to change the interface language. The choice
 persists across reloads and changing it does not clear form drafts. Market titles,
@@ -29,9 +38,11 @@ contract rules and source excerpts retain their original text; no translation
 model is invoked. Date readouts use the selected locale and local timezone.
 
 - Choose 1H, 6H, 1D, or 7D; scroll to zoom and drag to pan across all three panes.
-- The probability pane gets 60% of the canvas. Automatic probability scaling is
-  on initially, with a 0–100% option. The fixed readout shows observation time,
-  YES midpoint, sampled volume change and spread. Expand the chart to fill the
+- With enough height, the probability pane gets 60% of the canvas. Below 300px
+  canvas height, the chart uses a probability-only view; volume and spread remain
+  in the readout. Expand the chart to see their individual panes. Automatic
+  probability scaling is on initially, with a 0–100% option. The fixed readout shows observation time,
+  YES midpoint, bid/ask, sampled volume change and spread. Expand the chart to fill the
   viewport; zoom survives expansion and restoration.
 - Diamonds group stored signals in five-minute buckets; a count retains every
   underlying signal for selection in the inspector. Signal rows remain individual
@@ -56,7 +67,42 @@ Volume bars show changes between consecutive compatible REST samples, not
 individual trade executions. Gaps, counter resets, changed volume bases, and mixed
 units are not filled with invented volume. A change in a rolling-volume counter
 is still a counter change, not an interval trade-volume estimate. Spread is in
-percentage points. Cross-platform quote alignment remains on the comparison page.
+percentage points. Reviewed cross-platform comparisons remain on the comparison page.
+
+### Comparative chart views
+
+The terminal's **Single contract / Event comparison / Heatmap** switch reuses the
+main chart area. It does not append another dashboard below the chart. Contract
+lists and heatmap tiles scroll inside their panels on desktop.
+
+- **Quote band** is enabled initially on the single-contract chart. The shaded
+  interval spans the sampled best bid and ask, with explicit gaps for missing,
+  crossed, invalid or stale quotes. Auto scaling includes both boundaries. It is
+  a REST quote range, not order-book depth or executable size.
+- **Heatmap** shows the current workspace's selected watchlist or the collected
+  market sample. Equal-size tiles encode qualified 15-minute changes in percentage
+  points; the fixed color scale saturates at ±5 pp without capping the printed
+  number. Unavailable/stale windows are gray and display a dash; a valid unchanged
+  window displays `0.00 pp`. Quotes expire after 180 seconds even if refresh fails.
+  Platform filtering and pagination (60 tiles per page) keep coverage explicit.
+  Click a tile to open its contract. Heatmaps are disabled at historical cutoffs.
+- **Event comparison** uses operator-recorded event links, restricted to those
+  visible at the research cutoff. Select 1–6 contracts, a platform, a 1H/6H/1D
+  window, and either historical lines or bars at the cutoff. Related contracts
+  can overlap and have different settlement rules: values are independent and
+  are never normalized into a 100% distribution. A link is not equivalence review.
+
+`GET /api/v1/research/events/{slug}/chart` is an authenticated, typed Django Ninja
+endpoint. It reads up to 3,000 recent observations per selected contract through
+the analytical repository and reports truncation. At most 100 linked contracts
+are selectable. Python aligns observations to a shared 60-second grid plus the
+exact window endpoints. A quote must have been received **and recorded** by that
+grid point, be at most 90 seconds old (including its price timestamp), pass the
+price-quality checks, and match the linked rules and outcome. Invalid latest
+quotes, contract changes and gaps remain blank; there is no nearest-future match,
+interpolation, or fallback to an older valid quote. The response retains actual
+observation times and IDs. Collection intervals longer than 90 seconds naturally
+produce gaps rather than silently extending quote freshness.
 
 The interface uses restrained quote/transition animations and respects reduced
 motion preferences. The data table and signal/evidence controls provide accessible

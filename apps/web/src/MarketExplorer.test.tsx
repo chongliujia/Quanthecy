@@ -1,7 +1,10 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { fireEvent, render, screen } from '@testing-library/react'
-import { expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import MarketExplorer from './MarketExplorer'
+
+beforeEach(() => localStorage.clear())
+afterEach(() => localStorage.clear())
 
 vi.mock('./ProbabilityChart', () => ({ default: () => <div>Probability chart</div> }))
 
@@ -114,4 +117,85 @@ it('filters by a research topic and reports gaps without implying full coverage'
   expect(await screen.findByRole('region', { name: 'Topic coverage' })).toHaveTextContent('Awaiting first observation: 2. Targets needing attention: 3.')
   expect(fetch).toHaveBeenCalledWith(expect.stringContaining('&topic=fed-october'), expect.anything())
   expect(screen.getByText('A shared topic does not establish equivalent settlement rules or an arbitrage opportunity.')).toBeInTheDocument()
+})
+
+function mockTerminal() {
+  return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+    const path = String(input)
+    const body = path.endsWith('/watchlists') ? [{ id: 'list1', name: 'Rates', count: 1 }] : path.endsWith('/research/topics') || path.endsWith('/signals') || path.endsWith('/comparisons') ? []
+      : path.includes('/history?') ? { items: [], truncated: false, start: '2026-01-01T00:00:00Z', end: '2026-01-02T00:00:00Z' }
+        : path.includes('/timeline') ? { items: [], truncated: false }
+          : path.endsWith('/m1') ? { ...market, latest: { market: { resolution_rules: 'Inspect settlement wording', rules_version: 'v1' }, volume: null } }
+            : { items: [market], total: 1 }
+    return new Response(JSON.stringify(body))
+  })
+}
+
+it('keeps desktop research beside the chart and restores a hidden side panel', async () => {
+  const fetch = mockTerminal()
+  mount()
+  fireEvent.click(await screen.findByRole('button', { name: 'A research question?' }))
+  await screen.findByText('No observations in this window')
+  fireEvent.click(screen.getByRole('button', { name: 'Research' }))
+  expect(screen.getByRole('region', { name: 'Research inspector' })).toBeVisible()
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Contract' }))
+  expect(screen.getByText('Inspect settlement wording')).toBeVisible()
+  expect(screen.getByText('No observations in this window')).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: 'Hide side panel' }))
+  expect(screen.queryByRole('region', { name: 'Research inspector' })).not.toBeInTheDocument()
+  expect(localStorage.getItem('quanthecy.sidebar.u1')).toBe('false')
+  fireEvent.click(screen.getByRole('button', { name: 'Research & agent' }))
+  expect(screen.getByText('Inspect settlement wording')).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: '✧ Agent' }))
+  expect(screen.getByRole('dialog', { name: 'Research inspector' })).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: 'Close Research inspector' }))
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(screen.getByText('Market overview')).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: 'Markets' }))
+  expect(screen.getByLabelText('Filter market sidebar')).toBeVisible()
+  expect(fetch.mock.calls.every(([, options]) => !options?.method || options.method === 'GET')).toBe(true)
+})
+
+it('supports keyboard panel resizing and keeps the activity panel collapsible', async () => {
+  mockTerminal()
+  mount()
+  fireEvent.click(await screen.findByRole('button', { name: 'A research question?' }))
+  const side = await screen.findByRole('separator', { name: 'Side panel width' })
+  fireEvent.keyDown(side, { key: 'ArrowLeft' })
+  expect(side).toHaveAttribute('aria-valuenow', '320')
+  expect(localStorage.getItem('quanthecy.sidebar-width.u1')).toBe('320')
+  expect(screen.queryByRole('separator', { name: 'Activity panel height' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('tab', { name: /News & evidence/ }))
+  const activity = screen.getByRole('separator', { name: 'Activity panel height' })
+  fireEvent.keyDown(activity, { key: 'ArrowUp' })
+  expect(activity).toHaveAttribute('aria-valuenow', '196')
+  expect(screen.getByRole('tabpanel', { name: /News & evidence/ })).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: 'Collapse activity' }))
+  expect(screen.queryByRole('tabpanel')).not.toBeInTheDocument()
+  expect(screen.queryByRole('separator', { name: 'Activity panel height' })).not.toBeInTheDocument()
+})
+
+it('uses a closable research dialog on compact screens', async () => {
+  vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({ matches: query === '(max-width: 1100px)', media: query, onchange: null, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {}, dispatchEvent: () => true }))
+  mockTerminal()
+  mount()
+  fireEvent.click(await screen.findByRole('button', { name: 'A research question?' }))
+  await screen.findByText('No observations in this window')
+  expect(screen.queryByRole('separator', { name: 'Side panel width' })).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Research & agent' }))
+  expect(screen.getByRole('dialog', { name: 'Research inspector' })).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: 'Close Research inspector' }))
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+})
+
+
+it('preserves the selected watchlist between the scanner and market terminal', async () => {
+  const fetch = mockTerminal()
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><MarketExplorer userId="u1" watchlistId="list1" organization={{ id: 'org1', name: 'Research', slug: 'research', kind: 'TEAM', role: 'OWNER' }} /></QueryClientProvider>)
+  fireEvent.click(await screen.findByRole('button', { name: 'A research question?' }))
+  expect(await screen.findByLabelText('Watchlist')).toHaveValue('list1')
+  expect(fetch.mock.calls.some(([path]) => String(path).includes('/markets?limit=40') && String(path).includes('watchlist_id=list1&organization_id=org1'))).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: '← All markets' }))
+  expect(await screen.findByLabelText('Watchlist')).toHaveValue('list1')
 })

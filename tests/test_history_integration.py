@@ -37,7 +37,7 @@ def repository():
         url=admin.url, database=database, user=admin.user, password=admin.password
     )
     try:
-        assert migrate(repo) == ["0001_market_history"]
+        assert migrate(repo) == ["0001_market_history", "0002_market_catalog"]
         assert migrate(repo) == []
         yield repo
     finally:
@@ -222,3 +222,51 @@ def test_raw_cleanup_preserves_envelopes_signals_and_next_batch(repository):
     # A replay of the same frozen deletion cannot expand to the newly reconciled batch.
     raw.submit_deletion(job.pk, scope)
     assert raw.summary(scope)["protected"] == 10
+
+
+def test_catalog_page_replay_reconciles_once_without_price_history(repository):
+    from quanthecy.markets.catalog import run_catalog_ingestion
+    from quanthecy.markets.models import CatalogMarket
+    from quanthecy.markets.selection import market_id
+
+    collector = uuid4()
+    at = datetime.now(UTC).isoformat()
+    page = {
+        "schema_version": 1,
+        "page_id": 1,
+        "platform": "polymarket",
+        "observed_at": at,
+        "scan_id": str(uuid4()),
+        "pages": 1,
+        "rows_seen": 1,
+        "accepted": 1,
+        "skipped": 0,
+        "state": "complete",
+        "items": [
+            {
+                "id": str(market_id("polymarket", "123")),
+                "exchange_id": "123",
+                "title": "Directory only",
+                "status": "OPEN",
+                "closes_at": None,
+                "volume_24h": 12.0,
+                "volume_unit": "USD",
+            }
+        ],
+    }
+    row = {
+        "collector_id": str(collector),
+        "page_id": 1,
+        "received_at": at,
+        "envelope": json.dumps(page),
+    }
+    for _ in range(2):
+        repository.execute(
+            "INSERT INTO market_catalog_pages SETTINGS date_time_input_format='best_effort' "
+            "FORMAT JSONEachRow\n"
+            + json.dumps(row)
+        )
+    assert run_catalog_ingestion(repository) == 1
+    assert run_catalog_ingestion(repository) == 0
+    assert CatalogMarket.objects.count() == 1
+    assert not Market.objects.exists()

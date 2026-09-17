@@ -20,6 +20,7 @@ export const qualityReasons: Record<string, string> = {
   "constant_volume_baseline": "Volume baseline has no variation",
   "invalid_volume_rate": "Invalid volume change rate",
   "future_observation": "Observation timestamp is in the future",
+  "stale_price": "Price is older than 180 seconds",
   "stale_observation": "No observation in the past 180 seconds",
   "quality_not_evaluated": "Awaiting current quality policy",
   "analytics_pending": "New quote awaits window analysis",

@@ -9,6 +9,8 @@ from typing import Any
 from django.core.management.base import BaseCommand
 from django.db import close_old_connections
 
+from quanthecy.markets.catalog import run_catalog_ingestion
+from quanthecy.markets.collection import publish_analytics_heartbeat
 from quanthecy.markets.ingestion import run_ingestion
 from quanthecy.markets.repositories import history_repository
 from quanthecy.markets.selection import publish_selection
@@ -44,7 +46,17 @@ class Command(BaseCommand):
                 if dependencies["postgres"] and dependencies["clickhouse"]:
                     try:
                         batches = run_ingestion(history_repository())
+                        try:
+                            run_catalog_ingestion(history_repository())
+                        except Exception:
+                            logger.exception(
+                                "Directory reconciliation failed; quote ingestion continues"
+                            )
                         HEARTBEAT.touch()
+                        try:
+                            publish_analytics_heartbeat()
+                        except Exception:
+                            logger.warning("Analytics heartbeat unavailable; ingestion is durable")
                     except Exception:
                         logger.exception("Market worker batch failed; checkpoint retained")
                         HEARTBEAT.unlink(missing_ok=True)

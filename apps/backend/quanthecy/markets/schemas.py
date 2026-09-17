@@ -70,11 +70,27 @@ class CollectionSource(Schema):
     fresh_markets: int
     collector_checked_at: datetime | None
     error_code: Literal["network", "rate_limited", "exchange", "invalid_data", "storage"] | None
+    run_state: Literal[
+        "active",
+        "paused",
+        "pause_pending",
+        "configuration_pending",
+        "request_failed",
+        "no_heartbeat",
+        "delayed",
+        "unknown",
+    ] = "unknown"
+    managed: bool = False
+    enabled_targets: int | None = None
+    desired_revision: int | None = None
+    applied_revision: int | None = None
 
 
 class CollectionStatus(Schema):
     checked_at: datetime
     sources: list[CollectionSource]
+    analytics_state: Literal["active", "no_heartbeat", "unavailable"] = "unavailable"
+    analytics_checked_at: datetime | None = None
 
 
 class SignalOut(Schema):

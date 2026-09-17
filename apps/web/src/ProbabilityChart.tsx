@@ -13,8 +13,8 @@ import { time } from './format'
 
 registerCharts([LineChart, BarChart, ScatterChart, GridComponent, TooltipComponent, DataZoomComponent, MarkLineComponent, AxisPointerComponent, CanvasRenderer])
 export type ChartViewport = { start: number; end: number } | null
-export default function ProbabilityChart({ rows, signals = [], focus, onSignals, events = [], onEvidence, resetKey = 0, area = true, autoScale = false, viewport }: {
-  rows: Observation[]; signals?: Signal[]; focus?: string; onSignals?: (signals: Signal[]) => void; resetKey?: number; area?: boolean; autoScale?: boolean; events?: Evidence[]; onEvidence?: (items: Evidence[]) => void; viewport?: RefObject<ChartViewport>;
+export default function ProbabilityChart({ rows, signals = [], focus, onSignals, events = [], onEvidence, resetKey = 0, area = true, autoScale = false, quoteBand = false, viewport }: {
+  rows: Observation[]; signals?: Signal[]; focus?: string; onSignals?: (signals: Signal[]) => void; resetKey?: number; area?: boolean; autoScale?: boolean; quoteBand?: boolean; events?: Evidence[]; onEvidence?: (items: Evidence[]) => void; viewport?: RefObject<ChartViewport>;
 }) {
   const language = useLanguage()
   const { theme } = useTheme()
@@ -22,13 +22,17 @@ export default function ProbabilityChart({ rows, signals = [], focus, onSignals,
   const instance = useRef<ReturnType<typeof init> | null>(null)
   const callback = useRef(onSignals), evidenceCallback = useRef(onEvidence)
   const [cursor, setCursor] = useState<number | null>(null)
+  const [compact, setCompact] = useState(false)
   const data = useMemo(() => chartData(rows), [rows])
   useEffect(() => { callback.current = onSignals; evidenceCallback.current = onEvidence }, [onSignals, onEvidence])
   useEffect(() => {
     if (!element.current) return
     const chart = init(element.current, undefined, { renderer: 'canvas' })
     instance.current = chart
-    const observer = new ResizeObserver(() => chart.resize())
+    const observer = new ResizeObserver(() => {
+      setCompact((element.current?.clientHeight ?? 440) < 300)
+      chart.resize()
+    })
     observer.observe(element.current)
     chart.on('click', (params: unknown) => {
       const selected = (params as { data?: { signals?: Signal[]; evidence?: Evidence[] } }).data
@@ -64,32 +68,34 @@ export default function ProbabilityChart({ rows, signals = [], focus, onSignals,
       return nearest?.probability && Math.abs(Date.parse(nearest.received_at) - at) <= 90000 ? [{ value: [at, nearest.probability.value * 100], evidence: group, count: group.length }] : []
     })
     const markerLabel = { show: true, position: 'top', fontSize: 10, color: colors.text, backgroundColor: colors.surface, padding: [2, 3], borderRadius: 2, formatter: (params: { data: { count: number } }) => params.data.count > 1 ? String(params.data.count) : '' }
-    const bounds = autoScale ? probabilityBounds(data.probability.map((point) => point[1])) : { min: 0, max: 100 }
+    const bounds = autoScale ? probabilityBounds([...data.probability, ...(quoteBand ? [...data.bid, ...data.ask] : [])].map((point) => point[1])) : { min: 0, max: 100 }
     const option: EChartsCoreOption = {
       backgroundColor: 'transparent', animation: !window.matchMedia('(prefers-reduced-motion: reduce)').matches,
       animationDuration: 250, animationDurationUpdate: 200,
       textStyle: { fontFamily: 'ui-monospace, SFMono-Regular, Consolas, monospace' },
-      grid: [{ left: 20, right: 82, top: 18, height: '60%' }, { left: 20, right: 82, top: '69%', height: '10%' }, { left: 20, right: 82, top: '86%', height: '7%' }],
+      grid: [{ left: 20, right: 64, top: 18, bottom: compact ? 28 : 'auto', height: compact ? 'auto' : '60%' }, { left: 20, right: 64, top: '69%', height: '10%' }, { left: 20, right: 64, top: '86%', height: '7%' }],
       axisPointer: { link: [{ xAxisIndex: 'all' }], label: { backgroundColor: colors.pointer, color: '#ffffff' }, lineStyle: { color: colors.crosshair } },
       tooltip: { trigger: 'axis', showContent: false, axisPointer: { type: 'cross' } },
-      xAxis: [0, 1, 2].map((gridIndex) => ({ ...axisStyle, gridIndex, type: 'time', boundaryGap: false, splitLine: { show: true, lineStyle: { color: colors.gridMinor } }, axisLabel: { color: colors.muted, fontSize: 11, show: gridIndex === 2, hideOverlap: true }, axisPointer: { show: true, label: { show: gridIndex === 2, formatter: (params: { value: number }) => new Date(params.value).toLocaleString(locale()) } } })),
+      xAxis: [0, 1, 2].map((gridIndex) => ({ ...axisStyle, gridIndex, show: !compact || gridIndex === 0, type: 'time', boundaryGap: false, splitLine: { show: true, lineStyle: { color: colors.gridMinor } }, axisLabel: { color: colors.muted, fontSize: 11, show: gridIndex === (compact ? 0 : 2), hideOverlap: true }, axisPointer: { show: true, label: { show: gridIndex === (compact ? 0 : 2), formatter: (params: { value: number }) => new Date(params.value).toLocaleString(locale()) } } })),
       yAxis: [
-        { ...axisStyle, gridIndex: 0, type: 'value', position: 'right', ...bounds, axisLabel: { color: colors.muted, fontSize: 12, formatter: (value: number) => chartNumber(value, '%') }, axisPointer: { label: { formatter: (params: { value: number }) => chartNumber(params.value, '%') } } },
-        { ...axisStyle, gridIndex: 1, type: 'value', position: 'right', splitNumber: 2, name: `VOL · ${data.volumeUnit ?? t("N/A")}`, nameTextStyle: { color: colors.muted, fontSize: 11, align: 'right' }, axisLabel: { color: colors.muted, fontSize: 11, formatter: (value: number) => new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(value) }, axisPointer: { label: { formatter: (params: { value: number }) => chartNumber(params.value) } } },
-        { ...axisStyle, gridIndex: 2, type: 'value', position: 'right', splitNumber: 2, name: 'SPREAD · pp', nameTextStyle: { color: colors.muted, fontSize: 11, align: 'right' }, axisLabel: { color: colors.muted, fontSize: 11, formatter: (value: number) => chartNumber(value) }, axisPointer: { label: { formatter: (params: { value: number }) => chartNumber(params.value, ' pp') } } },
+        { ...axisStyle, gridIndex: 0, type: 'value', position: 'right', ...bounds, splitNumber: compact ? 3 : 5, axisLabel: { color: colors.muted, fontSize: 11, hideOverlap: true, formatter: (value: number) => chartNumber(value, '%') }, axisPointer: { label: { formatter: (params: { value: number }) => chartNumber(params.value, '%') } } },
+        { ...axisStyle, gridIndex: 1, show: !compact, type: 'value', position: 'right', splitNumber: 2, name: `VOL · ${data.volumeUnit ?? t("N/A")}`, nameTextStyle: { color: colors.muted, fontSize: 11, align: 'right' }, axisLabel: { color: colors.muted, fontSize: 11, formatter: (value: number) => new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(value) }, axisPointer: { label: { formatter: (params: { value: number }) => chartNumber(params.value) } } },
+        { ...axisStyle, gridIndex: 2, show: !compact, type: 'value', position: 'right', splitNumber: 2, name: 'SPREAD · pp', nameTextStyle: { color: colors.muted, fontSize: 11, align: 'right' }, axisLabel: { color: colors.muted, fontSize: 11, formatter: (value: number) => chartNumber(value) }, axisPointer: { label: { formatter: (params: { value: number }) => chartNumber(params.value, ' pp') } } },
       ],
       dataZoom: [{ type: 'inside', xAxisIndex: [0, 1, 2], filterMode: 'none', zoomOnMouseWheel: true, moveOnMouseMove: true, ...(viewport?.current ?? {}) }, { type: 'slider', xAxisIndex: [0, 1, 2], show: false, bottom: 2, height: 16, borderColor: colors.border, backgroundColor: colors.zoom, fillerColor: colors.zoomFill, showDetail: false, handleSize: 12, dataBackground: { lineStyle: { color: colors.zoomLine }, areaStyle: { color: colors.zoomArea } } }],
       series: [
-        { name: 'YES midpoint', type: 'line', data: data.probability, connectNulls: false, showSymbol: rows.length < 3, symbolSize: 5, lineStyle: { color: colors.line, width: 2.4 }, itemStyle: { color: colors.positive }, areaStyle: area ? { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: colors.areaTop }, { offset: 1, color: colors.areaBottom }] } } : undefined,
+        { name: 'YES midpoint', type: 'line', data: data.probability, connectNulls: false, showSymbol: rows.length < 3, symbolSize: 5, lineStyle: { color: colors.line, width: 2.4 }, itemStyle: { color: colors.positive }, areaStyle: area && !quoteBand ? { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: colors.areaTop }, { offset: 1, color: colors.areaBottom }] } } : undefined,
           markLine: { silent: true, symbol: 'none', data: last == null ? [] : [{ yAxis: last }], lineStyle: { color: colors.lastLine, type: 'dashed' }, label: { formatter: chartNumber(last, '%'), color: colors.onAccent, backgroundColor: colors.positive, padding: [4, 5], borderRadius: 3 } } },
         { name: 'News first observed', type: 'scatter', data: eventPoints, symbol: 'rect', symbolSize: 9, symbolOffset: [0, 20], label: { ...markerLabel, position: 'bottom' }, itemStyle: { color: colors.news }, cursor: 'pointer', z: 4 },
         { name: 'Signals', type: 'scatter', data: points, symbol: 'diamond', symbolSize: 11, label: markerLabel, z: 5, cursor: 'pointer', emphasis: { scale: 1.3, itemStyle: { borderColor: '#fff', borderWidth: 1 } } },
-        { name: 'Sampled volume change', type: 'bar', xAxisIndex: 1, yAxisIndex: 1, data: data.volume, itemStyle: { color: colors.volume }, barMaxWidth: 12 },
-        { name: 'Bid/ask spread', type: 'line', xAxisIndex: 2, yAxisIndex: 2, data: data.spread, connectNulls: false, showSymbol: false, lineStyle: { color: colors.spread, width: 1.5 } },
+        { name: 'Sampled volume change', type: 'bar', xAxisIndex: 1, yAxisIndex: 1, data: compact ? [] : data.volume, itemStyle: { color: colors.volume }, barMaxWidth: 12 },
+        { name: 'Bid/ask spread', type: 'line', xAxisIndex: 2, yAxisIndex: 2, data: compact ? [] : data.spread, connectNulls: false, showSymbol: false, lineStyle: { color: colors.spread, width: 1.5 } },
+        { name: 'Quote baseline', type: 'line', stack: 'quotes', stackStrategy: 'all', data: quoteBand ? data.bid : [], connectNulls: false, showSymbol: false, silent: true, lineStyle: { color: colors.news, width: 1, opacity: .6 }, areaStyle: { opacity: 0 }, z: 1 },
+        { name: 'Quote range', type: 'line', stack: 'quotes', stackStrategy: 'all', data: quoteBand ? data.band : [], connectNulls: false, showSymbol: false, silent: true, lineStyle: { color: colors.news, width: 1, opacity: .6 }, areaStyle: { color: colors.news, opacity: .18 }, z: 1 },
       ],
     }
     chart.setOption(option, { replaceMerge: ['series'] })
-  }, [rows, signals, events, area, autoScale, data, viewport, language, theme])
+  }, [rows, signals, events, area, autoScale, data, viewport, language, theme, compact, quoteBand])
   useEffect(() => {
     if (!focus || !instance.current) return
     const at = Date.parse(focus)
@@ -103,5 +109,5 @@ export default function ProbabilityChart({ rows, signals = [], focus, onSignals,
     if (row && Math.abs(Date.parse(row.received_at) - cursor) > 90000) row = undefined
   }
   const at = row ? Date.parse(row.received_at) : null
-  return <><div className="chart-readout" aria-label={t("Chart values")}><time>{row ? time(row.received_at) : t("No observation at cursor")}</time><span className="readout-primary">{t("YES")} <b>{chartNumber(row?.probability ? row.probability.value * 100 : null, '%')}</b></span><span>{t("Δ VOL")} <b>{chartNumber(data.volume.find(([stamp]) => stamp === at)?.[1])} {data.volumeUnit ?? ''}</b></span><span>{t("SPREAD")} <b>{chartNumber(data.spread.find(([stamp]) => stamp === at)?.[1], ' pp')}</b></span></div><div ref={element} className="terminal-chart" role="img" aria-label={`YES midpoint probability, sampled volume change and bid/ask spread. ${rows.length} observations. Scroll to zoom, drag to pan; select an event group to inspect all its inputs. Events grouped in five-minute buckets. Missing intervals appear as breaks.`} /></>
+  return <><div className={`chart-readout ${compact ? 'compact-readout' : ''}`} aria-label={t("Chart values")}><time>{row ? time(row.received_at) : t("No observation at cursor")}</time>{compact && <span className="chart-layout-note" title={t("Expand chart for volume & spread panes")}>{t("Probability view")}</span>}<span className="readout-primary">{t("YES")} <b>{chartNumber(row?.probability ? row.probability.value * 100 : null, '%')}</b></span><span>{t("Bid / ask")} <b>{chartNumber(data.bid.find(([stamp]) => stamp === at)?.[1], '%')} / {chartNumber(data.ask.find(([stamp]) => stamp === at)?.[1], '%')}</b></span><span>{t("Δ VOL")} <b>{chartNumber(data.volume.find(([stamp]) => stamp === at)?.[1])} {data.volumeUnit ?? ''}</b></span><span>{t("SPREAD")} <b>{chartNumber(data.spread.find(([stamp]) => stamp === at)?.[1], ' pp')}</b></span></div><div ref={element} className="terminal-chart" role="img" aria-label={`YES midpoint probability, sampled volume change and bid/ask spread. ${rows.length} observations. Scroll to zoom, drag to pan; select an event group to inspect all its inputs. Events grouped in five-minute buckets. Missing intervals appear as breaks.`} /></>
 }

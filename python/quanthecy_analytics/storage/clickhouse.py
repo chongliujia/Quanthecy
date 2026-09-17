@@ -182,3 +182,20 @@ class ClickHouseRepository:
                 },
             )
         ]
+
+    def catalog_collectors(self) -> list[UUID]:
+        return [
+            UUID(row["collector_id"])
+            for row in self.rows("SELECT DISTINCT collector_id FROM market_catalog_pages LIMIT 100")
+        ]
+
+    def catalog_pages(self, collector: UUID, after: int) -> list[dict[str, Any]]:
+        return [
+            json.loads(row["envelope"])
+            for row in self.rows(
+                "SELECT envelope FROM market_catalog_pages FINAL "
+                "WHERE collector_id = {collector:UUID} AND page_id > {after:UInt64} "
+                "ORDER BY page_id LIMIT 10",
+                {"collector": collector, "after": after},
+            )
+        ]

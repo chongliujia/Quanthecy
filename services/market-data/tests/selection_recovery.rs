@@ -60,3 +60,33 @@ fn reads_journals_from_before_managed_selection() {
     }
     std::fs::remove_dir_all(directory).unwrap();
 }
+
+#[test]
+fn runtime_pause_survives_restart_and_redis_loss() {
+    let directory =
+        std::env::temp_dir().join(format!("quanthecy-controls-{}", uuid::Uuid::new_v4()));
+    let value = json!({"schema_version":2,"revision":10,"enabled":false,
+        "universe":{"polymarket":[],"kalshi":[]},
+        "sources":{"polymarket":{"enabled":false,"interval_seconds":300},"kalshi":{"enabled":false,"interval_seconds":60}}});
+    {
+        let mut spool = Spool::open(&directory).unwrap();
+        spool
+            .apply_selection(Selection::parse(value.to_string().as_bytes()).unwrap())
+            .unwrap();
+    }
+    {
+        let spool = Spool::open(&directory).unwrap();
+        let sources = spool
+            .journal
+            .selection
+            .as_ref()
+            .unwrap()
+            .sources
+            .as_ref()
+            .unwrap();
+        assert!(!sources["polymarket"].enabled);
+        assert!(!sources["kalshi"].enabled);
+        assert_eq!(sources["polymarket"].interval_seconds, 300);
+    }
+    std::fs::remove_dir_all(directory).unwrap();
+}

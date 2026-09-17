@@ -81,3 +81,9 @@ input,textarea,select,.vTextField {font:12px var(--font-family-primary);border:1
 .console-panel summary { cursor:pointer; }
 
 .quality-note { white-space:normal; line-height:1.8; }
+
+.console-directory-panel .console-filters {display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px}
+.console-directory-panel .console-filters label {display:grid;gap:6px;min-width:130px;flex:1}
+.console-directory-panel .console-filters input,.console-directory-panel .console-filters select {width:100%;margin:0}
+.console-directory-table {max-height:520px;overscroll-behavior:contain}
+.console-directory-table .console-table thead th {position:sticky;top:0;z-index:1}

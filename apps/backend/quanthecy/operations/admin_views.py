@@ -3,6 +3,7 @@ from typing import Any
 from urllib.parse import urlencode
 from uuid import UUID
 
+from django.conf import settings
 from django.contrib import admin, messages
 from django.core.exceptions import ValidationError
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseBadRequest
@@ -290,4 +291,139 @@ def collection_coverage(request: HttpRequest) -> HttpResponse:
         selected=selected,
         sections=sections,
         plan=selection_status(),
+    )
+
+
+@require_http_methods(["GET", "POST"])
+def collection_controls(request: HttpRequest) -> HttpResponse:
+    from quanthecy.markets.controls import FIELDS, CollectionControlsForm, configure_collection
+    from quanthecy.markets.models import CollectionPlan
+    from quanthecy.markets.selection import PLAN_ID, selection_status
+    from quanthecy.research.models import EvidenceSource
+
+    from .heartbeats import news_heartbeat
+
+    actor = current_user(request)
+    require_operator(actor, "markets.change_collectionplan")
+    plan = CollectionPlan.objects.filter(pk=PLAN_ID).first() or CollectionPlan()
+    form = CollectionControlsForm(
+        request.POST if request.method == "POST" else None,
+        initial={"revision": plan.revision, **{field: getattr(plan, field) for field in FIELDS}},
+    )
+    if request.method == "POST" and form.is_valid():
+        try:
+            configure_collection(actor, form.cleaned_data)
+        except ValidationError as exc:
+            form.add_error(None, exc)
+        else:
+            messages.success(
+                request,
+                tr(
+                    "Saved. Awaiting collector confirmation; refresh to check.",
+                    "已保存，等待采集器确认；刷新可查看生效状态。",
+                ),
+            )
+            return redirect("platform_ops:collection_controls")
+    return render(
+        request,
+        "collection_controls",
+        title=tr("Collection controls", "采集控制"),
+        form=form,
+        plan=selection_status(),
+        collection=collection_status(),
+        news_sources=EvidenceSource.objects.all()
+        if actor.has_perm("research.view_evidencesource")
+        else [],
+        news_heartbeat=news_heartbeat(),
+        news_enabled=settings.NEWS_FEEDS_ENABLED,
+    )
+
+
+@require_http_methods(["GET", "POST"])
+def market_directory(request: HttpRequest) -> HttpResponse:
+    from uuid import UUID
+
+    from quanthecy.markets.catalog import (
+        COVERAGE_FIELDS,
+        CoverageControlsForm,
+        configure_coverage,
+        directory,
+        discovery_health,
+        select_catalog,
+    )
+    from quanthecy.markets.models import CatalogScan, CollectionPlan, ResearchTopic
+    from quanthecy.markets.selection import PLAN_ID, selection_status
+
+    actor = current_user(request)
+    require_operator(actor, "operations.view_collection_status")
+    plan = CollectionPlan.objects.filter(pk=PLAN_ID).first() or CollectionPlan()
+    controls = CoverageControlsForm(
+        request.POST
+        if request.method == "POST" and request.POST.get("action") == "configure"
+        else None,
+        initial={
+            "revision": plan.revision,
+            **{field: getattr(plan, field) for field in COVERAGE_FIELDS},
+        },
+    )
+    error = ""
+    if request.method == "POST":
+        try:
+            if request.POST.get("action") == "configure":
+                if controls.is_valid():
+                    configure_coverage(actor, controls.cleaned_data)
+                else:
+                    raise ValidationError(tr("Check discovery settings.", "请检查目录采集设置。"))
+            elif request.POST.get("action") == "select":
+                select_catalog(
+                    actor,
+                    ids=[UUID(value) for value in request.POST.getlist("market_ids")],
+                    topic_id=UUID(request.POST.get("topic", "")),
+                    tier=request.POST.get("tier", ""),
+                    revision=int(request.POST.get("revision", "0")),
+                    reason=request.POST.get("reason", ""),
+                )
+            else:
+                return HttpResponseBadRequest("Unknown operation")
+        except (ValueError, ValidationError) as exc:
+            error = (
+                "; ".join(exc.messages)
+                if isinstance(exc, ValidationError)
+                else tr("Invalid selection.", "所选内容无效。")
+            )
+        else:
+            messages.success(
+                request,
+                tr(
+                    "Saved. Collection will apply the new revision.", "已保存，采集器将应用新版本。"
+                ),
+            )
+            return redirect("platform_ops:market_directory")
+    platform = request.GET.get("platform", "")
+    search = request.GET.get("search", "")
+    try:
+        offset = int(request.GET.get("offset", "0"))
+        if (
+            platform not in ("", "polymarket", "kalshi")
+            or len(search) > 200
+            or not 0 <= offset <= 1000000
+        ):
+            raise ValueError
+    except ValueError:
+        return HttpResponseBadRequest("Invalid directory filters")
+    return render(
+        request,
+        "market_directory",
+        title=tr("Market discovery", "市场发现"),
+        directory=directory(platform=platform, search=search, offset=offset, limit=50),
+        filters={"platform": platform, "search": search},
+        previous=max(0, offset - 50),
+        next=offset + 50,
+        scans=CatalogScan.objects.all(),
+        discovery_health=discovery_health(),
+        topics=ResearchTopic.objects.filter(enabled=True),
+        controls=controls,
+        plan=plan,
+        selection=selection_status(),
+        error=error,
     )

@@ -89,6 +89,10 @@ class ResearchTopic(models.Model):
 
 
 class CollectionTarget(models.Model):
+    class Tier(models.TextChoices):
+        PRIORITY = "priority", "Priority"
+        STANDARD = "standard", "Standard"
+
     class Platform(models.TextChoices):
         POLYMARKET = "polymarket", "Polymarket"
         KALSHI = "kalshi", "Kalshi"
@@ -99,6 +103,7 @@ class CollectionTarget(models.Model):
     exchange_id = models.CharField(max_length=255)
     label = models.CharField(max_length=300)
     rationale = models.TextField(max_length=2000)
+    tier = models.CharField(max_length=20, choices=Tier.choices, default=Tier.PRIORITY)
     enabled = models.BooleanField(default=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -126,8 +131,98 @@ class CollectionPlan(models.Model):
 
     id = models.UUIDField(primary_key=True, default=uuid.UUID(int=1), editable=False)
     managed = models.BooleanField(default=False)
+    controls_managed = models.BooleanField(default=False)
+    polymarket_enabled = models.BooleanField(default=True)
+    polymarket_interval_seconds = models.PositiveIntegerField(default=60)
+    kalshi_enabled = models.BooleanField(default=True)
+    kalshi_interval_seconds = models.PositiveIntegerField(default=60)
+    coverage_managed = models.BooleanField(default=False)
+    catalog_enabled = models.BooleanField(default=False)
+    catalog_interval_seconds = models.PositiveIntegerField(default=3600)
+    catalog_page_interval_seconds = models.PositiveIntegerField(default=10)
+    catalog_max_pages = models.PositiveIntegerField(default=200)
+    standard_interval_seconds = models.PositiveIntegerField(default=300)
     revision = models.PositiveBigIntegerField(default=1)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        default_permissions = ("view", "change")
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(polymarket_interval_seconds__gte=15)
+                & models.Q(polymarket_interval_seconds__lte=3600),
+                name="polymarket_poll_interval_bounds",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(kalshi_interval_seconds__gte=15)
+                & models.Q(kalshi_interval_seconds__lte=3600),
+                name="kalshi_poll_interval_bounds",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    catalog_interval_seconds__gte=300, catalog_interval_seconds__lte=86400
+                ),
+                name="catalog_interval_seconds_bounds",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    catalog_page_interval_seconds__gte=5, catalog_page_interval_seconds__lte=300
+                ),
+                name="catalog_page_interval_seconds_bounds",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(catalog_max_pages__gte=1, catalog_max_pages__lte=1000),
+                name="catalog_max_pages_bounds",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(
+                    standard_interval_seconds__gte=60, standard_interval_seconds__lte=3600
+                ),
+                name="standard_interval_seconds_bounds",
+            ),
+        ]
+
+
+class CatalogMarket(models.Model):
+    """Discovery metadata, deliberately separate from sampled prices and analytics."""
+
+    id = models.UUIDField(primary_key=True, editable=False)
+    platform = models.CharField(max_length=20)
+    exchange_id = models.CharField(max_length=255)
+    title = models.TextField()
+    status = models.CharField(max_length=20)
+    closes_at = models.DateTimeField(null=True)
+    volume_24h = models.FloatField(null=True)
+    volume_unit = models.CharField(max_length=20)
+    first_seen_at = models.DateTimeField()
+    last_seen_at = models.DateTimeField(db_index=True)
+
+    class Meta:
         default_permissions = ("view",)
+        constraints = [
+            models.UniqueConstraint(
+                fields=["platform", "exchange_id"], name="catalog_exchange_unique"
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=["platform", "status", "-volume_24h"], name="catalog_platform_activity"
+            )
+        ]
+
+
+class CatalogCheckpoint(models.Model):
+    collector_id = models.UUIDField(primary_key=True)
+    page_id = models.PositiveBigIntegerField(default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class CatalogScan(models.Model):
+    platform = models.CharField(max_length=20, primary_key=True)
+    observed_at = models.DateTimeField()
+    scan_id = models.UUIDField()
+    pages = models.PositiveIntegerField()
+    rows_seen = models.PositiveIntegerField()
+    accepted = models.PositiveIntegerField()
+    skipped = models.PositiveIntegerField()
+    state = models.CharField(max_length=20)

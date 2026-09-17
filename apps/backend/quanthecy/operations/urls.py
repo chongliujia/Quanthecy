@@ -12,6 +12,14 @@ urlpatterns = [
         admin.site.admin_view(admin_views.collection_coverage),
         name="collection_coverage",
     ),
+    path(
+        "controls/",
+        admin.site.admin_view(admin_views.collection_controls),
+        name="collection_controls",
+    ),
+    path(
+        "directory/", admin.site.admin_view(admin_views.market_directory), name="market_directory"
+    ),
     path("quality/", admin.site.admin_view(admin_views.data_quality), name="data_quality"),
     path("raw/", admin.site.admin_view(admin_views.raw_payloads), name="raw_payloads"),
     path(

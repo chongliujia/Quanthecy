@@ -39,7 +39,7 @@ MODEL_LABELS = {
     "auth_group": ("Permission groups", "权限组"),
     "markets_researchtopic": ("Research topics", "研究主题"),
     "markets_collectiontarget": ("Collection targets", "采集名单"),
-    "markets_market": ("Markets", "市场目录"),
+    "markets_market": ("Collected markets", "已采集行情"),
     "markets_event": ("Events", "市场事件"),
     "markets_outcome": ("Outcomes", "合约结果"),
     "markets_ingestioncheckpoint": ("Ingestion checkpoints", "采集检查点"),
@@ -79,6 +79,13 @@ def console_context(request: HttpRequest) -> dict[str, Any]:
             [
                 ("admin:index", "Overview", "运行总览", "overview", None),
                 (
+                    "platform_ops:collection_controls",
+                    "Collection controls",
+                    "采集控制",
+                    "settings",
+                    "markets.change_collectionplan",
+                ),
+                (
                     "platform_ops:dashboard",
                     "Collection health",
                     "数据采集",
@@ -91,6 +98,13 @@ def console_context(request: HttpRequest) -> dict[str, Any]:
             "Data",
             "数据管理",
             [
+                (
+                    "platform_ops:market_directory",
+                    "Market discovery",
+                    "市场发现",
+                    "market",
+                    "operations.view_collection_status",
+                ),
                 (
                     "admin:research_evidencesource_changelist",
                     "News sources",
@@ -135,8 +149,8 @@ def console_context(request: HttpRequest) -> dict[str, Any]:
                 ),
                 (
                     "admin:markets_market_changelist",
-                    "Markets",
-                    "市场目录",
+                    "Collected markets",
+                    "已采集行情",
                     "market",
                     "markets.view_market",
                 ),

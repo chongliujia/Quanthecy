@@ -6,9 +6,15 @@ work. It complements the architecture boundaries in [AGENTS.md](../AGENTS.md).
 
 ## Audience and purpose
 
-Quanthecy primarily serves the maintainer's own research and other quantitative
-researchers. General users access the same underlying evidence through readable
-summaries, charts, and explanations.
+Quanthecy primarily serves prediction-market traders and event-driven investors.
+Traders need to monitor selected contracts, identify meaningful changes, and check
+the data behind a signal. Investors need to follow events, compare contract rules,
+review evidence, and revisit their research assumptions. Quantitative researchers
+also need inspectable inputs and reproducible calculations.
+
+These audiences share one research platform and organization model. The proposed
+next iteration is described in [Trader and investor experience](trader-investor-experience.md);
+its roadmap items are not claims of shipped functionality.
 
 The main workflow is:
 

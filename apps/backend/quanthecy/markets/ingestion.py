@@ -8,6 +8,8 @@ from quanthecy_analytics.contracts.validation import validate_observation
 from quanthecy_analytics.signals import analyze
 from quanthecy_analytics.storage.clickhouse import ClickHouseRepository
 
+from quanthecy.alerts.evaluation import evaluate_observation
+
 from .models import Event, IngestionCheckpoint, Market, Outcome
 
 
@@ -97,6 +99,7 @@ def process_batch(repository: ClickHouseRepository, collector: UUID) -> bool:
             metrics, signals = analyze(history[:1000], truncated=len(history) > 1000)
             repository.save_signals(signals)
             reconcile(row, metrics)
+            evaluate_observation(repository, row)
         checkpoint.batch_id = int(batch["batch_id"])
         checkpoint.save(update_fields=["batch_id", "updated_at"])
     return True

@@ -25,6 +25,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let collector = Collector::from_env().map_err(|e| e.to_string())?;
     let state: Status = Arc::new(tokio::sync::RwLock::new(json!({"status":"starting"})));
     let (stop, receiver) = tokio::sync::watch::channel(false);
+    let catalog = Collector::catalog_from_env().map_err(|e| e.to_string())?;
+    let catalog_task = tokio::spawn(quanthecy_market_data::catalog::run(
+        catalog,
+        receiver.clone(),
+    ));
     let task = tokio::spawn(collector.run(state.clone(), receiver));
     let app = Router::new()
         .route("/health", get(|| async { Json(json!({"status": "ok"})) }))
@@ -39,6 +44,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .await?;
     let _ = stop.send(true);
     task.await?;
+    catalog_task.await?;
     info!(service = "market-data", "shutdown complete");
     Ok(())
 }

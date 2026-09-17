@@ -34,6 +34,31 @@ class EventContract(Schema):
     linked_at: datetime
 
 
+class EventChartPoint(Schema):
+    at: datetime
+    probability: float | None
+    observed_at: datetime | None
+    observation_id: UUID | None
+    issue: Literal["missing", "stale", "invalid_quote", "contract_changed"] | None
+
+
+class EventChartSeries(Schema):
+    market_id: UUID
+    points: list[EventChartPoint]
+    truncated: bool
+
+
+class EventChart(Schema):
+    event: EventSummary
+    start: datetime
+    end: datetime
+    step_seconds: int
+    max_age_seconds: int
+    contracts: list[EventContract]
+    contracts_truncated: bool
+    series: list[EventChartSeries]
+
+
 class EventReviewOut(Schema):
     id: UUID
     relation: Literal["DIRECT", "BACKGROUND", "UNRELATED"]

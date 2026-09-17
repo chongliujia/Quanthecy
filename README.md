@@ -67,6 +67,10 @@ docker compose down
 - **Evidence you can inspect.** Event dossiers connect a versioned research question to contracts, official documents, original paragraphs, and append-only relevance reviews.
 - **Traceable Agent work.** Models interpret deterministic metrics within frozen context. Reports retain citations, expert stages, model/configuration versions, usage, limitations, and validation diagnostics.
 
+## Watch the markets that matter
+
+Use **Watchlists & alerts** to build shared workspace lists, filter the scanner, and set midpoint-change or spread-widening conditions. In-app alerts retain their quote inputs and rule versions, suppress stale data, and avoid repeating a sustained condition. They do not launch model requests. See [the workflow and limits](docs/watchlists-alerts.md).
+
 ## Feature tour
 
 Expand a workflow to see its desktop screenshot and details. This page uses English images; the [Chinese README](README.zh-CN.md) uses Chinese images. All 16 original captures and their dates are in the [screenshot index](docs/images/README.md).
@@ -226,7 +230,7 @@ Illustrative quick-research JSON; reference IDs are placeholders, not an actual 
 | Quality-gated metrics, signals, reviewed comparisons, exports | Richer features, lead/lag studies and historical backtesting |
 | Official document versions, event dossiers, paragraph-level relevance reviews | Broader source coverage, linked PDF ingestion, inferred knowledge-graph relationships |
 | On-demand specialist and quick research, frozen inputs, validation diagnostics | Outcome reconciliation, forecast calibration, signal-triggered research and scheduled digests |
-| Workspaces, memberships, bilingual administration | Watchlists/alerts, billing, subscriptions, invitations and external login |
+| Workspace watchlists, sampled price/spread alerts, personal read state | External alert delivery, billing, subscriptions, invitations and external login |
 
 Collected snapshots do not provide a complete tick history or executable liquidity. Cross-platform coverage is curated. Forecasts are conditional and uncalibrated; no measured accuracy or profitability is claimed. The initial focus is research, with macroeconomics and interest rates as the first curated topic.
 
@@ -240,7 +244,10 @@ A single-server Docker Compose configuration is provided in [compose.prod.yaml](
 | --- | --- |
 | [Research terminal](docs/research-terminal.md) | Chart interactions, model connections, quotas and jobs |
 | [Specialist intelligence team](docs/intelligence-team.md) | Roles, scoped context, reports and validation |
+| [Watchlists and alerts](docs/watchlists-alerts.md) | Workspace lists, rule windows, trigger provenance and worker recovery |
 | [Data quality](docs/data-quality.md) | Eligibility checks and measurement limits |
+| [Market discovery](docs/market-directory.md) | Paginated directory, bulk selection, collection tiers and settlement checks |
+| [Collection controls](docs/collection-controls.md) | Admin switches, per-source frequency, acknowledgement and recovery |
 | [Collection coverage](docs/collection-coverage.md) | Topics, selected contracts and collector acknowledgement |
 | [Event dossiers](docs/event-evidence.md) | Event definitions, exact source versions and relevance review |
 | [News sources](docs/news-sources.md) | Feed registry, source controls, provenance and collection health |

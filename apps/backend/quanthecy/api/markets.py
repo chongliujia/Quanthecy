@@ -2,10 +2,12 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
+from django.core.exceptions import ValidationError
 from django.http import HttpRequest, HttpResponse
 from ninja import Query, Router
 
 from quanthecy.markets import services
+from quanthecy.markets.catalog import CatalogPage, directory
 from quanthecy.markets.collection import collection_status
 from quanthecy.markets.schemas import (
     CollectionStatus,
@@ -14,6 +16,10 @@ from quanthecy.markets.schemas import (
     MarketPage,
     SignalOut,
 )
+from quanthecy.organizations.policies import require_org_member
+from quanthecy.watchlists.services import get_list
+
+from .auth import current_user
 
 router = Router(tags=["Markets"])
 
@@ -32,9 +38,38 @@ def markets(
     sort: Literal["recent", "movement", "volume_anomaly"] = "recent",
     offset: int = Query(0, ge=0, le=100000),
     limit: int = Query(20, ge=1, le=100),
+    watchlist_id: UUID | None = None,
+    organization_id: UUID | None = None,
 ) -> MarketPage:
+    market_ids = None
+    if watchlist_id:
+        if organization_id is None:
+            raise ValidationError("A workspace is required for watchlist filtering.")
+        require_org_member(current_user(request), organization_id)
+        watchlist = get_list(organization_id, watchlist_id)
+        market_ids = list(watchlist.items.values_list("market_id", flat=True))
     return services.list_markets(
-        platform=platform, search=search, sort=sort, offset=offset, limit=limit, topic=topic
+        platform=platform,
+        search=search,
+        sort=sort,
+        offset=offset,
+        limit=limit,
+        topic=topic,
+        market_ids=market_ids,
+    )
+
+
+@router.get("/market-directory", response=CatalogPage)
+def market_directory(
+    request: HttpRequest,
+    platform: Literal["polymarket", "kalshi", ""] = "",
+    search: str = Query("", max_length=200),
+    offset: int = Query(0, ge=0, le=1000000),
+    limit: int = Query(20, ge=1, le=100),
+    collected: Literal["all", "collected", "directory"] = "all",
+) -> CatalogPage:
+    return directory(
+        platform=platform, search=search, offset=offset, limit=limit, collected=collected
     )
 
 

@@ -14,6 +14,13 @@ it('leaves sampling gaps open and never invents volume across missing intervals'
   const result = chartData([row(0, 10), row(5, 100)])
   expect(result.probability.map((point) => point[1])).toEqual([0, null, 0])
   expect(result.volume.map((point) => point[1])).toEqual([null, null])
+  expect(result.bid.map((point) => point[1])).toEqual([0, null, 0])
+  expect(result.ask.map((point) => point[1])).toEqual([2, null, 2])
+})
+it('never paints a quote band for missing, crossed, stale or out-of-range quotes', () => {
+  const result = chartData([row(0, 0), row(1, 0, { best_bid: null }), row(2, 0, { best_bid: .9, best_ask: .8 }), row(3, 0, { best_ask: 1.1 }), row(4, 0, { quality_flags: ['STALE'] })])
+  expect(result.bid.map((point) => point[1])).toEqual([0, null, null, null, null])
+  expect(result.band.map((point) => point[1])).toEqual([2, null, null, null, null])
 })
 it('does not combine different volume units or chart an invalid crossed spread', () => {
   const result = chartData([row(0, 10), row(1, 20, { volume: { value: 20, unit: 'CONTRACTS', basis: 'CUMULATIVE' }, best_bid: 0.6, best_ask: 0.5 })])

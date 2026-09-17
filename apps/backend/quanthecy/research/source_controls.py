@@ -10,7 +10,7 @@ from quanthecy.accounts.models import User
 from quanthecy.operations.models import PlatformAuditLog
 
 from .feed_registry import FEEDS
-from .models import EvidenceSource
+from .models import EvidenceItem, EvidenceSource
 
 
 @transaction.atomic
@@ -44,6 +44,7 @@ def configure_source(
             "next_poll_at",
         ]
     )
+    EvidenceItem.objects.filter(source=source).update(document_lease=None)
     PlatformAuditLog.objects.create(
         actor=actor,
         action="news.source_configured",

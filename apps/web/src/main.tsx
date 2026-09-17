@@ -5,6 +5,8 @@ import App from './App'
 import './styles.css'
 import './terminal.css'
 import './theme.css'
+import './watchlists.css'
+import './analyticsCharts.css'
 
 const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 ReactDOM.createRoot(document.getElementById('root')!).render(

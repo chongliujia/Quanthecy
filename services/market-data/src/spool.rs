@@ -22,6 +22,12 @@ pub struct Journal {
     pub latest: BTreeMap<String, Value>,
     pub pending: Vec<Value>,
     pub raw: Vec<Value>,
+    #[serde(default)]
+    pub catalog: BTreeMap<String, crate::catalog::ScanState>,
+    #[serde(default)]
+    pub catalog_page_id: u64,
+    #[serde(default)]
+    pub catalog_pending: Option<Value>,
 }
 
 pub struct Spool {

@@ -11,6 +11,7 @@ import { ResearchOverview, ComparisonList, ComparisonView, EvidenceList, Evidenc
 const EventPages = lazy(() => import('./EventPages'))
 const ModelSettings = lazy(() => import('./ModelSettings'))
 const MarketExplorer = lazy(() => import('./MarketExplorer'))
+const WatchlistsPage = lazy(() => import('./WatchlistsPage'))
 
 function AuthForm() {
   const client = useQueryClient()
@@ -56,7 +57,7 @@ function Workspace({ user }: { user: User }) {
   const route = useRoute()
   const [navCollapsed, setNavCollapsed] = useLayoutPreference(`quanthecy.nav.${user.id}`, true, (value): value is boolean => typeof value === 'boolean')
   const cutoff = route.params.get('cutoff') ?? ''
-  const navigation = [['overview', t("Research overview"), '01'], ['markets', t("Market explorer"), '02'], ['signals', t("Signal feed"), '03'], ['comparisons', t("Cross-platform"), '04'], ['evidence', t("News & evidence"), '05'], ['events', t('Event dossiers'), '08'], ['workspace', t("Workspace & members"), '06'], ['model-settings', t("Model settings"), '07']]
+  const navigation = [['overview', t("Research overview"), '01'], ['watchlists', t('Watchlists & alerts'), '09'], ['markets', t("Market explorer"), '02'], ['signals', t("Signal feed"), '03'], ['comparisons', t("Cross-platform"), '04'], ['evidence', t("News & evidence"), '05'], ['events', t('Event dossiers'), '08'], ['workspace', t("Workspace & members"), '06'], ['model-settings', t("Model settings"), '07']]
   const heading = navigation.find(([path]) => path === route.page)?.[1] ?? t("Page not found")
   const organizations = useQuery({ queryKey: ['organizations', user.id], queryFn: () => api<Organization[]>('/organizations?limit=100') })
   const active = organizations.data?.find((org) => org.id === selected) ?? organizations.data?.[0]
@@ -66,7 +67,7 @@ function Workspace({ user }: { user: User }) {
     onSuccess: async (org) => { setSelected(org.id); setName(''); setShowCreate(false); await client.invalidateQueries({ queryKey: ['organizations', user.id] }) } })
   const logout = useMutation({ mutationFn: () => api('/auth/logout', 'POST'),
     onSuccess: async () => { await client.cancelQueries(); client.removeQueries({ predicate: (query) => query.queryKey[0] !== 'me' }); client.setQueryData(['me'], null) } })
-  return <div className={`workspace-layout ${route.page === 'markets' && route.id ? 'terminal-mode' : ''} ${navCollapsed ? 'nav-collapsed' : ''} ${route.page === 'model-settings' ? 'settings-mode' : ''}`}>
+  return <div className={`workspace-layout ${route.page === 'markets' ? route.id ? 'terminal-mode' : 'market-list-mode' : ''} ${navCollapsed ? 'nav-collapsed' : ''} ${route.page === 'model-settings' ? 'settings-mode' : ''} ${route.page === 'watchlists' ? 'watchlist-mode' : ''}`}>
     <aside><button className="nav-toggle" aria-label={navCollapsed ? t("Expand navigation") : t("Collapse navigation")} aria-expanded={!navCollapsed} onClick={() => setNavCollapsed(!navCollapsed)}>{navCollapsed ? '☰' : '‹'}<span>{t("Workspace")}</span></button><span className="eyebrow">{t("YOUR WORKSPACE")}</span>
       <label className="sr-only" htmlFor="organization">{t("Active workspace")}</label>
       <select id="organization" value={active?.id ?? ''} onChange={(event) => setSelected(event.target.value)} disabled={!organizations.data?.length}>
@@ -91,7 +92,8 @@ function Workspace({ user }: { user: User }) {
       </form>}
       {organizations.data?.length === 0 && <p>{t("Create a workspace to begin organizing your research.")}</p>}
       {route.page === 'overview' && <ResearchOverview userId={user.id} />}
-      {route.page === 'markets' && <Suspense fallback={<p role="status">{t("Loading market explorer…")}</p>}><MarketExplorer organization={active} cutoff={cutoff} userId={user.id} selectedId={route.id ?? null} onSelect={(id) => navigate(id ? `/markets/${id}` : '/markets')} /></Suspense>}
+      {route.page === 'watchlists' && <Suspense fallback={<p role="status">{t('Loading watchlists…')}</p>}><WatchlistsPage userId={user.id} organization={active} /></Suspense>}
+      {route.page === 'markets' && <Suspense fallback={<p role="status">{t("Loading market explorer…")}</p>}><MarketExplorer key={active?.id} organization={active} watchlistId={route.params.get('watchlist') ?? ''} cutoff={cutoff} userId={user.id} selectedId={route.id ?? null} onSelect={(id) => navigate(id ? `/markets/${id}` : '/markets')} /></Suspense>}
       {route.page === 'model-settings' && <Suspense fallback={<p role="status">{t("Loading model settings…")}</p>}><ModelSettings key={active?.id} userId={user.id} organization={active} /></Suspense>}
       {route.page === 'events' && <Suspense fallback={<p role="status">{t('Loading event research…')}</p>}><EventPages key={`${route.id}-${cutoff}`} userId={user.id} slug={route.id} cutoff={cutoff} /></Suspense>}
       {route.page === 'signals' && <SignalFeed userId={user.id} />}

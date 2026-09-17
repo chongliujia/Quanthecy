@@ -4,14 +4,15 @@ import { t } from './i18n'
 import { time } from './format'
 import type { DocumentCollection, OfficialDocument } from './researchTypes'
 
-export default function OfficialDocumentPanel({ document, collection, historical }: {
-  document?: OfficialDocument | null; collection?: DocumentCollection | null; historical: boolean
+export default function OfficialDocumentPanel({ document, collection, historical, supported = true }: {
+  document?: OfficialDocument | null; collection?: DocumentCollection | null; historical: boolean; supported?: boolean
 }) {
   const route = useRoute()
   const selectedParagraph = Number(route.params.get('paragraph'))
   const [expanded, setExpanded] = useState(selectedParagraph > 8)
   useEffect(() => { if (selectedParagraph > 0) globalThis.document.getElementById(`paragraph-${selectedParagraph}`)?.scrollIntoView?.({ block: 'center' }) }, [selectedParagraph, document])
   const paragraphs = document?.text.split('\n\n') ?? []
+  if ((!supported || collection?.state === 'unsupported') && !document) return <section className="panel official-document"><h3>{t('Feed coverage')}</h3><p>{t('This source provides feed metadata and excerpts. Full article text is not collected; follow the original source link to read it.')}</p></section>
   return <section className="panel official-document" aria-label={t('Official document text')}>
     <div className="section-heading"><h3>{t('Official document text')}</h3><span className={`badge ${document ? '' : 'badge-amber'}`}>{document ? t('Text captured') : t('Feed excerpt only')}</span></div>
     {collection?.state === 'retrying' && <p className="data-warning">{t('The latest document refresh failed. Saved evidence remains available; collection will retry.')} {t('Next check:')} {time(collection.next_poll_at)}</p>}

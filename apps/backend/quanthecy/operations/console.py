@@ -92,6 +92,13 @@ def console_context(request: HttpRequest) -> dict[str, Any]:
             "数据管理",
             [
                 (
+                    "admin:research_evidencesource_changelist",
+                    "News sources",
+                    "新闻来源",
+                    "file",
+                    "research.view_evidencesource",
+                ),
+                (
                     "platform_ops:collection_coverage",
                     "Collection coverage",
                     "主题与采集覆盖",

@@ -16,7 +16,7 @@ from django.db.models import OuterRef, Subquery
 from django.utils import timezone
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 
-from .feeds import SOURCES, NoRedirects
+from .feeds import NoRedirects
 from .models import EvidenceItem, EvidenceRevision
 
 EXTRACTOR = "fed-article-v1"
@@ -205,6 +205,7 @@ def persist_document(
             **values,
             document=saved,
             raw_document=raw,
+            raw_feed_fields=previous.raw_feed_fields,
             content_hash=revision_hash({**values, "document": saved}),
         )
     # Navigation/HTML churn with identical extracted content does not create revisions.
@@ -234,7 +235,7 @@ def poll_one_document() -> bool:
     with transaction.atomic():
         item = (
             EvidenceItem.objects.select_for_update(skip_locked=True)
-            .filter(source_id__in=SOURCES, document_next_poll_at__lte=now)
+            .filter(source_id__in=PATHS, source__enabled=True, document_next_poll_at__lte=now)
             .annotate(publication=Subquery(latest.values("published_at")[:1]))
             .filter(publication__lte=now)
             .order_by("document_next_poll_at", "-publication", "id")

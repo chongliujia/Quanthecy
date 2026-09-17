@@ -212,7 +212,8 @@ def build_context(market_id: UUID, cutoff: datetime) -> dict[str, Any]:
         )
     limitations = [
         "REST snapshots; exchange quote time is unavailable. "
-        "Topic and timing do not establish causation.",
+        "Topic and timing do not establish causation. Media feed excerpts are secondary "
+        "reports, not official statements or independent confirmation of one another.",
         "Official document passages are bounded excerpts selected by policy terms, not the "
         "complete article. Omitted passages may qualify or contradict an interpretation. "
         "Captured text covers the source page only; linked articles and PDF attachments "

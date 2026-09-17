@@ -2,6 +2,7 @@ import uuid
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
 
@@ -90,6 +91,29 @@ class EvidenceSource(models.Model):
     etag = models.CharField(max_length=500, blank=True)
     last_modified = models.CharField(max_length=200, blank=True)
     error = models.CharField(max_length=200, blank=True)
+    enabled = models.BooleanField(default=True)
+    poll_interval_seconds = models.PositiveIntegerField(
+        default=900, validators=[MinValueValidator(300), MaxValueValidator(86400)]
+    )
+    consecutive_failures = models.PositiveIntegerField(default=0)
+    last_result = models.CharField(max_length=20, blank=True)
+    last_entry_count = models.PositiveIntegerField(default=0)
+    last_rejected_count = models.PositiveIntegerField(default=0)
+    last_duplicate_count = models.PositiveIntegerField(default=0)
+    last_undated_count = models.PositiveIntegerField(default=0)
+    latest_published_at = models.DateTimeField(null=True, blank=True)
+    poll_lease = models.UUIDField(null=True, editable=False)
+    lease_expires_at = models.DateTimeField(null=True, editable=False)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(
+                    poll_interval_seconds__gte=300, poll_interval_seconds__lte=86400
+                ),
+                name="evidence_poll_interval_bounds",
+            )
+        ]
 
     def __str__(self) -> str:
         return self.name
@@ -125,6 +149,7 @@ class EvidenceRevision(AppendOnly):
     content_hash = models.CharField(max_length=64)
     document = models.JSONField(default=dict, editable=False)
     raw_document = models.TextField(blank=True, editable=False)
+    raw_feed_fields = models.JSONField(default=dict, editable=False)
 
     class Meta:
         constraints = [models.UniqueConstraint(fields=["item", "version"], name="evidence_version")]
@@ -188,12 +213,12 @@ class EventDefinition(AppendOnly):
         ]
 
     def clean(self) -> None:
-        from .feeds import SOURCES
+        from .feed_registry import OFFICIAL_SOURCES
 
         if (
             not isinstance(self.source_slugs, list)
             or not 1 <= len(self.source_slugs) <= 10
-            or any(not isinstance(s, str) or s not in SOURCES for s in self.source_slugs)
+            or any(not isinstance(s, str) or s not in OFFICIAL_SOURCES for s in self.source_slugs)
         ):
             raise ValidationError({"source_slugs": "Choose 1–10 registered official feed IDs."})
 

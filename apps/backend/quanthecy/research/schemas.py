@@ -11,6 +11,8 @@ from quanthecy.markets.schemas import SignalOut
 
 from .documents import OfficialDocument
 
+SourceStatus = Literal["paused", "pending", "healthy", "partial", "empty", "retrying", "stale"]
+
 
 class SourceOut(Schema):
     slug: str
@@ -19,6 +21,21 @@ class SourceOut(Schema):
     last_checked_at: datetime | None
     last_success_at: datetime | None
     error: str
+    kind: Literal["OFFICIAL", "MEDIA", "UNKNOWN"]
+    enabled: bool
+    poll_interval_seconds: int
+    next_poll_at: datetime
+    status: SourceStatus
+    last_entry_count: int
+    last_rejected_count: int
+    last_duplicate_count: int
+    last_undated_count: int
+    latest_published_at: datetime | None
+
+
+class SourcePage(Schema):
+    sources: list[SourceOut]
+    polling_enabled: bool
 
 
 class FrozenMarket(Schema):
@@ -91,7 +108,7 @@ class DocumentSummary(Schema):
 
 
 class DocumentCollection(Schema):
-    state: Literal["pending", "available", "retrying", "disabled"]
+    state: Literal["pending", "available", "retrying", "disabled", "unsupported"]
     last_checked_at: datetime | None
     last_success_at: datetime | None
     next_poll_at: datetime
@@ -104,6 +121,9 @@ class EvidenceOut(Schema):
     version: int
     source_slug: str
     source_name: str
+    source_kind: Literal["OFFICIAL", "MEDIA", "UNKNOWN"] = "UNKNOWN"
+    quality_flags: list[str] = Field(default_factory=list)
+    document_supported: bool = False
     title: str
     excerpt: str
     url: str

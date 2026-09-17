@@ -354,3 +354,8 @@ td, th, .members li, .signal-row, .evidence-card, .source-panel article, .review
 
 .format-note { padding:10px 12px; border-left:3px solid var(--theme-accent,#50d6c5); background:var(--theme-accent-bg,#112923); color:var(--theme-text,#d5dcec); font-size:12px; line-height:1.65; }
 .expert-body li, .run-result li { white-space:pre-line; }
+
+.news-sources { margin-block: 1rem; }
+.news-sources summary { cursor: pointer; font-weight: 600; }
+.news-sources td { vertical-align: top; }
+.news-sources td small { display: block; margin-top: .4rem; max-width: 22rem; }

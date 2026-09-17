@@ -25,9 +25,10 @@ export function ResearchTime({ cutoff, path }: { cutoff: string; path: string })
 }
 
 export function EvidenceCard({ item, cutoff = '', compact = false }: { item: Evidence; cutoff?: string; compact?: boolean }) {
-  return <article className="evidence-card"><div className="evidence-meta"><span>{item.source_name}</span><span>{t("Published")} {time(item.published_at)}</span></div>
+  return <article className="evidence-card"><div className="evidence-meta"><span>{t(item.source_name)} · {t(item.source_kind === 'OFFICIAL' ? 'Official' : item.source_kind === 'MEDIA' ? 'Media' : 'Unknown source type')}</span><span>{t("Published")} {time(item.published_at)}</span></div>
     <h3><a href={`#${withCutoff(`/evidence/${item.id}`, cutoff)}`}>{item.title}</a></h3>
     {!compact && item.excerpt !== item.title && <p>{item.excerpt}</p>}
-    <div className="evidence-footer"><span>{t("First observed")} {time(item.first_observed_at)} {t("· v")}{item.version} · {item.document ? t('Text captured') : t('Feed excerpt only')}</span><a href={item.url} target="_blank" rel="noopener noreferrer">{t("Official source ↗")}</a></div>
+    {item.quality_flags?.includes('PUBLICATION_TIME_UNKNOWN') && <p className="quiet">{t('Publication time is unavailable; collection time is not a substitute.')}</p>}
+    <div className="evidence-footer"><span>{t("First observed")} {time(item.first_observed_at)} {t("· v")}{item.version} · {item.document ? t('Text captured') : t('Feed excerpt only')}</span><a href={item.url} target="_blank" rel="noopener noreferrer">{t(item.source_kind === 'OFFICIAL' ? "Official source ↗" : "Original source ↗")}</a></div>
   </article>
 }

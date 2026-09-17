@@ -20,7 +20,7 @@ from .event_schemas import (
     EventSummary,
     Passage,
 )
-from .feeds import SOURCES
+from .feed_registry import OFFICIAL_SOURCES
 from .models import (
     EventDefinition,
     EventEvidence,
@@ -53,7 +53,7 @@ def append_definition(value: EventDefinition) -> None:
     if (
         not isinstance(value.source_slugs, list)
         or not 1 <= len(value.source_slugs) <= 10
-        or any(not isinstance(s, str) or s not in SOURCES for s in value.source_slugs)
+        or any(not isinstance(s, str) or s not in OFFICIAL_SOURCES for s in value.source_slugs)
     ):
         raise ValidationError("Choose 1–10 official feed IDs.")
     value.full_clean()

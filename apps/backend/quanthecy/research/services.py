@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from typing import cast
 from uuid import UUID
 
 from django.conf import settings
@@ -12,7 +13,8 @@ from quanthecy_analytics.comparisons import aligned_history
 from quanthecy.markets.models import Market
 from quanthecy.markets.repositories import history_repository
 
-from .documents import OfficialDocument
+from .documents import PATHS, OfficialDocument
+from .feed_registry import FEEDS
 from .models import (
     Comparison,
     ComparisonReview,
@@ -33,6 +35,8 @@ from .schemas import (
     ResearchOverview,
     ReviewOut,
     SourceOut,
+    SourcePage,
+    SourceStatus,
     TimelineEntry,
     TimelineOut,
 )
@@ -57,8 +61,51 @@ def overview() -> ResearchOverview:
         reviewed_pairs=Comparison.objects.filter(reviews__isnull=False).distinct().count(),
         evidence_items=visible_evidence(now).count(),
         latest_observation=Market.objects.aggregate(value=Max("last_observed_at"))["value"],
-        sources=[SourceOut.from_orm(source) for source in EvidenceSource.objects.order_by("slug")],
+        sources=source_list().sources,
         news_polling_enabled=settings.NEWS_FEEDS_ENABLED,
+    )
+
+
+def source_value(source: EvidenceSource) -> SourceOut:
+    spec = FEEDS.get(source.slug)
+    status = (
+        "paused"
+        if not settings.NEWS_FEEDS_ENABLED or not source.enabled
+        else "retrying"
+        if source.error
+        else "pending"
+        if source.last_success_at is None
+        else "stale"
+        if timezone.now() - source.last_success_at
+        > timedelta(seconds=max(1800, source.poll_interval_seconds * 2))
+        else source.last_result
+        if source.last_result in {"empty", "partial"}
+        else "healthy"
+    )
+    return SourceOut(
+        slug=source.slug,
+        name=source.name,
+        url=source.url,
+        last_checked_at=source.last_checked_at,
+        last_success_at=source.last_success_at,
+        error=source.error,
+        kind=spec.kind if spec else "UNKNOWN",
+        enabled=source.enabled,
+        poll_interval_seconds=source.poll_interval_seconds,
+        next_poll_at=source.next_poll_at,
+        status=cast(SourceStatus, status),
+        last_entry_count=source.last_entry_count,
+        last_rejected_count=source.last_rejected_count,
+        last_duplicate_count=source.last_duplicate_count,
+        last_undated_count=source.last_undated_count,
+        latest_published_at=source.latest_published_at,
+    )
+
+
+def source_list() -> SourcePage:
+    return SourcePage(
+        sources=[source_value(s) for s in EvidenceSource.objects.order_by("slug")],
+        polling_enabled=settings.NEWS_FEEDS_ENABLED,
     )
 
 
@@ -140,12 +187,16 @@ def visible_evidence(at: datetime) -> QuerySet[EvidenceRevision]:
 
 def evidence_value(revision: EvidenceRevision) -> EvidenceOut:
     document = OfficialDocument.model_validate(revision.document) if revision.document else None
+    spec = FEEDS.get(revision.item.source_id)
     return EvidenceOut(
         id=revision.item_id,
         revision_id=revision.id,
         version=revision.version,
         source_slug=revision.item.source_id,
         source_name=revision.item.source.name,
+        source_kind=spec.kind if spec else "UNKNOWN",
+        quality_flags=[] if revision.published_at else ["PUBLICATION_TIME_UNKNOWN"],
+        document_supported=revision.item.source_id in PATHS,
         title=revision.title,
         excerpt=revision.excerpt,
         url=revision.url,
@@ -162,12 +213,16 @@ def evidence_value(revision: EvidenceRevision) -> EvidenceOut:
 
 
 def evidence_list(
-    cutoff: datetime | None, source: str, search: str, offset: int, limit: int
+    cutoff: datetime | None, source: str, search: str, offset: int, limit: int, kind: str = ""
 ) -> EvidencePage:
     at = cutoff_time(cutoff)
     query = visible_evidence(at)
     if source:
         query = query.filter(item__source_id=source)
+    if kind:
+        query = query.filter(
+            item__source_id__in=[s for s, spec in FEEDS.items() if spec.kind == kind]
+        )
     if search:
         query = query.filter(Q(title__icontains=search) | Q(excerpt__icontains=search))
     return EvidencePage(
@@ -208,8 +263,12 @@ def evidence_detail(item_id: UUID, cutoff: datetime | None) -> EvidenceDetail:
         document=OfficialDocument.model_validate(current.document) if current.document else None,
         document_collection=DocumentCollection(
             state=(
-                "disabled"
-                if not settings.NEWS_FEEDS_ENABLED or not settings.NEWS_DOCUMENTS_ENABLED
+                "unsupported"
+                if current.item.source_id not in PATHS
+                else "disabled"
+                if not settings.NEWS_FEEDS_ENABLED
+                or not settings.NEWS_DOCUMENTS_ENABLED
+                or not current.item.source.enabled
                 else "retrying"
                 if current.item.document_error
                 else "available"

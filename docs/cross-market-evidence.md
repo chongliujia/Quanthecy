@@ -7,28 +7,17 @@ continue to come through the Rust collector. Reviewed pairs are explicitly selec
 this is not an exhaustive matching service. A similar title is not proof of equivalent
 settlement, and a price difference is not an arbitrage recommendation.
 
-The initial news worker reads only these public Federal Reserve RSS feeds:
+The news worker collects a curated set of official US economic announcements and
+business-news feeds. See [news sources](news-sources.md) for the current registry,
+defaults, source controls and connectivity results. The default polling interval is
+15 minutes, configurable per source, with bounded RSS/Atom parsing and conditional
+requests. Feed metadata and revisions are kept in PostgreSQL. Full-page capture is
+separately restricted to [supported official documents](official-evidence.md).
 
-| Source | Feed | Coverage |
-| --- | --- | --- |
-| Monetary policy releases | https://www.federalreserve.gov/feeds/press_monetary.xml | FOMC decisions, minutes and other monetary releases |
-| Speeches | https://www.federalreserve.gov/feeds/speeches.xml | Federal Reserve speeches; topic relevance varies |
-
-These feeds are listed in the [Federal Reserve RSS directory](https://www.federalreserve.gov/feeds/feeds.htm).
-Poll each at most every 15 minutes, with conditional HTTP requests, bounded responses
-(2 MiB) and at most 50 entries per response. Store feed-provided titles, excerpts,
-publication dates, links, content hashes and immutable revisions in PostgreSQL.
-No article pages or full-text archives are downloaded. There is no automatic deletion
-policy yet; these low-volume metadata records remain until an operator explicitly
-adopts a retention policy. This does not provide historical news coverage before
-collection starts. The feeds may omit older entries, edits or deletions between polls.
-Failed requests retain existing evidence and are visible in source status.
-
-News collection is independent of market analytics. `NEWS_FEEDS_ENABLED=false` pauses
-polling. `NEWS_PROXY_URL` optionally configures outbound requests. Only the source
-registry's HTTPS feed URLs are fetched; redirects are refused. Articles remain links
-to the publisher. The Linux loopback-proxy override also exposes PostgreSQL on
-127.0.0.1:15432 for the news worker, alongside the existing local collector setup.
+`NEWS_FEEDS_ENABLED=false` pauses collection; `NEWS_PROXY_URL` configures optional
+egress. Failures preserve history and trigger bounded retry backoff. Source state
+is available in the customer UI and the operator console. Publication, successful
+collection and full-text availability are distinct concepts.
 
 ## Time and interpretation
 
@@ -40,7 +29,7 @@ cutoff. A later correction never overwrites an earlier version. Feed entries wit
 valid publication time carry an explicit unknown date.
 
 Automatic associations use a deliberately broad, versioned topic rule: markets with
-Federal Reserve / FOMC wording can be associated with these Fed feeds. They are marked
+Federal Reserve / FOMC wording can be associated with selected US official feeds and media entries containing explicit Fed/US macro wording. They are marked
 `TOPIC_ONLY`, with no causal claim. Operators can append a reviewed association or a
 rejection in Django Admin. A review made today does not appear in yesterday's timeline.
 
@@ -112,7 +101,7 @@ do not require a customer to be a Django staff user. Curation uses operator perm
 | `GET /api/v1/research/overview` | Coverage counts and feed health |
 | `GET /api/v1/comparisons` | Latest available review per pair |
 | `GET /api/v1/comparisons/{id}` | Current alignment, five-minute history and reviews |
-| `GET /api/v1/evidence` | Filtered/paginated official feed entries |
+| `GET /api/v1/evidence` | Filtered/paginated official and media feed entries |
 | `GET /api/v1/evidence/{id}` | Evidence revisions and latest known associations |
 | `GET /api/v1/markets/{id}/timeline` | Source-linked topic evidence |
 | `GET /api/v1/signals` | Latest 100 deterministic signals in the past seven days |
@@ -133,7 +122,7 @@ evidence are explicitly labeled as opening the latest market view.
 Evidence detail returns at most 100 revisions and 100 associations; market timelines
 return at most 100 associations (with truncation indicated), displaying ten at a time.
 The automatic topic-association pass considers at most 100 Fed-titled markets and
-the 100 most recently first-observed selected feed entries. This deliberately bounded
+up to 500 latest visible revisions, selecting at most 100 macro-topic candidates. This deliberately bounded
 MVP does not claim comprehensive news coverage or causal attribution.
 
 ## Verification record — 16 September 2026 (Asia/Shanghai)

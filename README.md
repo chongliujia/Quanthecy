@@ -36,7 +36,7 @@ The `migrate` service applies Django and ClickHouse migrations before dependent 
 
 1. Register in the web app. Registration creates a personal workspace and its OWNER membership. **There is no default account or password.**
 2. Open **Market explorer**. By default, the collector samples up to 10 markets per exchange every 60 seconds. Price/volume analytics need at least 15 minutes of sufficiently continuous, eligible observations.
-3. Explore **News & evidence**. An independent worker polls two selected official Federal Reserve feeds every 15 minutes. Example topics and event dossiers require operator initialization; they are not automatically populated on every fresh install.
+3. Explore **News & evidence**. An independent worker polls six enabled official and media feeds every 15 minutes by default; two BLS feeds start paused after an HTTP 403 connectivity check. See [news sources](docs/news-sources.md) for coverage and controls. Example topics and event dossiers require operator initialization; they are not automatically populated on every fresh install.
 4. For Agent research, follow the [model setup guide](docs/research-terminal.md) to configure credential encryption and a provider, then enable it in **Model settings** as a workspace owner. Models start disabled; explicitly initiated connection tests and research can incur provider charges.
 
 <details>
@@ -132,7 +132,7 @@ The example shows 10 linked contracts and 30 evidence entries awaiting review, w
 <details>
 <summary>News and evidence</summary>
 
-Search official Federal Reserve announcements and speeches, filter by source, and apply a research cutoff to inspect the saved versions available at that time. Each entry distinguishes publication time from first observation, shows its revision and text-capture status, and links to the official source. Open a document to inspect its captured body and earlier saved versions. See the [official evidence guide](docs/official-evidence.md).
+Search official economic announcements and selected business news, filter by source or official/media type, and apply a research cutoff to inspect the saved versions available at that time. Each entry distinguishes publication time from first observation, shows its revision and text-capture status, and links to the original source. Full-page text capture is available for the supported Fed release and speech adapters; other sources show feed-only coverage. Inspect current source health and pause/resume collection in Admin. The screenshot below predates the expanded source registry. See the [official evidence guide](docs/official-evidence.md).
 
 ![English desktop news and evidence list with search, source filters, document versions, and observation times](docs/images/en/news-evidence.png)
 
@@ -164,7 +164,7 @@ Rust + Tokio collector ──────► ClickHouse: historical observations
         └────► Redis: live state       ▼
                               Python: deterministic metrics + signals
                                        │
-Official Fed feeds                     ▼
+Official + media feeds                 ▼
         │                     Frozen research context
         ▼                              │
 Python news worker                     ▼
@@ -243,6 +243,7 @@ A single-server Docker Compose configuration is provided in [compose.prod.yaml](
 | [Data quality](docs/data-quality.md) | Eligibility checks and measurement limits |
 | [Collection coverage](docs/collection-coverage.md) | Topics, selected contracts and collector acknowledgement |
 | [Event dossiers](docs/event-evidence.md) | Event definitions, exact source versions and relevance review |
+| [News sources](docs/news-sources.md) | Feed registry, source controls, provenance and collection health |
 | [Official documents](docs/official-evidence.md) | Source capture, paragraph provenance and limits |
 | [Market research](docs/market-research.md) | History, signals, exports and reproducibility |
 | [Comparisons and evidence](docs/cross-market-evidence.md) | Rule alignment, official feeds and historical cutoffs |

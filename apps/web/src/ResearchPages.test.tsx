@@ -31,14 +31,14 @@ it('shows exclusion reasons without inventing a zero difference', async () => {
 })
 
 it('explains evidence collection cutoff for an empty historical feed', async () => {
-  vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ items: [], total: 0 })))
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async input => new Response(JSON.stringify(String(input).includes('/research/sources') ? { sources: [], polling_enabled: true } : { items: [], total: 0 })))
   mount(<EvidenceList userId="u1" cutoff="2026-01-01T00:00:00Z" />)
   expect(await screen.findByText('No evidence available for this view')).toBeInTheDocument()
   expect(screen.getByText(/Older publication dates do not imply/)).toBeInTheDocument()
 })
 
 it('presents publisher time separately from observation time and unreviewed association', async () => {
-  const item = { id: 'e1', revision_id: 'v1', version: 1, title: 'Official Fed statement', excerpt: 'Feed excerpt', url: 'https://www.federalreserve.gov/statement.htm', published_at: '2026-01-01T10:00:00Z', first_observed_at: '2026-01-02T10:00:00Z', observed_at: '2026-01-02T10:00:00Z', source_name: 'Federal Reserve', content_hash: 'sha256' }
+  const item = { id: 'e1', revision_id: 'v1', version: 1, title: 'Official Fed statement', excerpt: 'Feed excerpt', url: 'https://www.federalreserve.gov/statement.htm', published_at: '2026-01-01T10:00:00Z', first_observed_at: '2026-01-02T10:00:00Z', observed_at: '2026-01-02T10:00:00Z', source_name: 'Federal Reserve', source_kind: 'OFFICIAL', content_hash: 'sha256' }
   vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ item, revisions: [item], links: [{ id: 'l1', market_id: 'm1', status: 'TOPIC_ONLY', rationale: 'Topic wording only', method: 'fed-topic-v1', created_at: '2026-01-02T11:00:00Z' }] })))
   mount(<EvidenceView userId="u1" id="e1" cutoff="" />)
   expect(await screen.findByText('Official Fed statement')).toBeInTheDocument()
@@ -52,6 +52,30 @@ it('supports recoverable signal-feed errors', async () => {
   mount(<SignalFeed userId="u1" />)
   expect(await screen.findByRole('alert')).toHaveTextContent('Historical data unavailable')
   expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+})
+
+it('filters media sources and shows current collection problems separately from history', async () => {
+  const source = { slug: 'bbc-business', name: 'BBC · Business', kind: 'MEDIA', url: 'https://feeds.bbci.co.uk/news/business/rss.xml', enabled: true, status: 'retrying', poll_interval_seconds: 900, last_success_at: null, latest_published_at: null, last_entry_count: 0, last_rejected_count: 0, last_duplicate_count: 0, last_undated_count: 0, error: 'Feed refresh failed (HTTP 429); stored evidence retained.' }
+  const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async input => new Response(JSON.stringify(String(input).includes('/research/sources') ? { sources: [source], polling_enabled: true } : { items: [], total: 0 })))
+  mount(<EvidenceList userId="u1" cutoff="2026-01-02T00:00:00Z" />)
+  expect(await screen.findByRole('option', { name: 'BBC · Business' })).toBeInTheDocument()
+  fireEvent.change(screen.getByRole('combobox', { name: 'Source type' }), { target: { value: 'MEDIA' } })
+  await waitFor(() => expect(fetch.mock.calls.some(([url]) => String(url).includes('kind=MEDIA'))).toBe(true))
+  fireEvent.click(screen.getByText(/News source coverage/))
+  expect(screen.getByText('Collection retrying')).toBeVisible()
+  expect(screen.getByText(/Current collection status/)).toBeVisible()
+  expect(screen.getByText('15 minutes')).toBeVisible()
+})
+
+it('does not call media an official source or promise a pending full article', async () => {
+  const item = { id: 'e2', revision_id: 'v1', version: 1, title: 'Fed policy reporting', excerpt: 'A media excerpt', url: 'https://www.bbc.co.uk/news/example', published_at: null, first_observed_at: '2026-01-02T10:00:00Z', observed_at: '2026-01-02T10:00:00Z', source_name: 'BBC · Business', source_kind: 'MEDIA', document_supported: false, quality_flags: ['PUBLICATION_TIME_UNKNOWN'], content_hash: 'sha256' }
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ item, revisions: [item], links: [] })))
+  mount(<EvidenceView userId="u1" id="e2" cutoff="2026-01-03T00:00:00Z" />)
+  expect(await screen.findByRole('link', { name: 'Original source ↗' })).toHaveAttribute('href', item.url)
+  expect(screen.queryByRole('link', { name: 'Official source ↗' })).not.toBeInTheDocument()
+  expect(screen.getByText(/Full article text is not collected/)).toBeVisible()
+  expect(screen.getByText(/collection time is not a substitute/)).toBeVisible()
+  expect(screen.queryByText('Official document text')).not.toBeInTheDocument()
 })
 
 it('opens shared routes directly and responds to browser navigation', async () => {

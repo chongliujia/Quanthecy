@@ -1,5 +1,6 @@
 from typing import Any
 
+from django import forms
 from django.contrib import admin
 from django.core.exceptions import ValidationError
 from django.db import transaction
@@ -10,6 +11,7 @@ from quanthecy.api.auth import current_user
 from quanthecy.markets.models import Market
 from quanthecy.operations.console import label, tr
 
+from .feed_registry import FEEDS
 from .models import (
     Comparison,
     ComparisonReview,
@@ -19,6 +21,7 @@ from .models import (
     EvidenceSource,
 )
 from .reviews import append_review, snapshot
+from .source_controls import configure_source
 
 
 class HistoricalAdmin(admin.ModelAdmin):
@@ -65,11 +68,106 @@ class ComparisonReviewAdmin(HistoricalAdmin):
         append_review(obj)
 
 
+class SourceForm(ModelForm):
+    change_reason = forms.CharField(label=label("Reason for change", "修改原因"), max_length=500)
+
+    class Meta:
+        model = EvidenceSource
+        fields = ("enabled", "poll_interval_seconds")
+        labels = {
+            "enabled": label("Collection enabled", "启用采集"),
+            "poll_interval_seconds": label("Polling interval (seconds)", "采集间隔（秒）"),
+        }
+        help_texts = {
+            "enabled": label("Pausing preserves collected history.", "暂停后保留已采集历史。"),
+            "poll_interval_seconds": label(
+                "300–86400 seconds; failures back off automatically.",
+                "300–86400 秒，失败后自动延长重试间隔。",
+            ),
+        }
+
+
 @admin.register(EvidenceSource)
-class EvidenceSourceAdmin(HistoricalAdmin):
-    list_display = ("name", "last_success_at", "last_checked_at", "error")
+class EvidenceSourceAdmin(admin.ModelAdmin):
+    form = SourceForm
+    list_display = (
+        "name",
+        "source_kind",
+        "enabled",
+        "collection_state",
+        "poll_interval_seconds",
+        "last_success_at",
+        "next_poll_at",
+        "last_entry_count",
+        "error",
+    )
+    list_filter = ("enabled", "last_result")
+    search_fields = ("name", "slug")
+    actions = None
+    readonly_fields = (
+        "slug",
+        "name",
+        "url",
+        "source_kind",
+        "source_notes",
+        "collection_state",
+        "last_checked_at",
+        "last_success_at",
+        "next_poll_at",
+        "latest_published_at",
+        "last_entry_count",
+        "last_rejected_count",
+        "last_duplicate_count",
+        "last_undated_count",
+        "consecutive_failures",
+        "error",
+    )
+
+    @admin.display(description=label("Source type", "来源类型"))
+    def source_kind(self, obj: EvidenceSource) -> str:
+        spec = FEEDS.get(obj.slug)
+        return tr("Official", "官方") if spec and spec.kind == "OFFICIAL" else tr("Media", "媒体")
+
+    @admin.display(description=label("Collection status", "采集状态"))
+    def collection_state(self, obj: EvidenceSource) -> str:
+        from .services import source_value
+
+        names = {
+            "paused": ("Paused", "已暂停"),
+            "pending": ("Pending", "等待采集"),
+            "healthy": ("Healthy", "采集正常"),
+            "partial": ("Partial", "部分条目存在问题"),
+            "empty": ("Empty feed", "无可用条目"),
+            "retrying": ("Retrying", "等待重试"),
+            "stale": ("Overdue", "采集超时未更新"),
+        }
+        return tr(*names[source_value(obj).status])
+
+    @admin.display(description=label("Source notes", "来源说明"))
+    def source_notes(self, obj: EvidenceSource) -> str:
+        spec = FEEDS.get(obj.slug)
+        if spec and spec.notes:
+            return tr(spec.notes, "首次连通性检查返回 HTTP 403，请确认部署环境可访问后再启用。")
+        return tr(
+            "Feed metadata and excerpts. Full-page capture is separately allowlisted.",
+            "采集订阅元数据与摘要。正文采集使用单独白名单。",
+        )
+
+    def save_model(
+        self, request: HttpRequest, obj: EvidenceSource, form: Any, change: bool
+    ) -> None:
+        configure_source(
+            obj.pk,
+            enabled=obj.enabled,
+            interval=obj.poll_interval_seconds,
+            reason=form.cleaned_data["change_reason"],
+            actor=current_user(request),
+        )
 
     def has_add_permission(self, request: HttpRequest) -> bool:
+        return False
+
+    def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
         return False
 
 
@@ -93,6 +191,10 @@ class EvidenceItemAdmin(HistoricalAdmin):
 
     @admin.display(description=label("Document status", "正文采集状态"))
     def document_status(self, obj: EvidenceItem) -> str:
+        from .documents import PATHS
+
+        if obj.source_id not in PATHS:
+            return tr("Feed excerpt only", "仅采集订阅摘要")
         if obj.document_error:
             return tr("Retrying", "等待重试") + f" · {obj.document_error}"
         return (
@@ -107,7 +209,7 @@ class EvidenceItemAdmin(HistoricalAdmin):
 class EvidenceRevisionAdmin(HistoricalAdmin):
     list_display = ("title", "version", "published_at", "observed_at", "has_document")
     search_fields = ("title",)
-    readonly_fields = ("document", "raw_document")
+    readonly_fields = ("document", "raw_document", "raw_feed_fields")
 
     @admin.display(description=label("Official text", "官方正文"), boolean=True)
     def has_document(self, obj: EvidenceRevision) -> bool:

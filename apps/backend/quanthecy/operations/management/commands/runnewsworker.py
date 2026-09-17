@@ -17,7 +17,7 @@ HEARTBEAT = Path("/tmp/quanthecy-news-heartbeat")
 
 
 class Command(BaseCommand):
-    help = "Poll selected official news feeds independently of market analytics."
+    help = "Poll curated official and media feeds independently of market analytics."
 
     def handle(self, *args: Any, **options: Any) -> None:
         stopped = Event()

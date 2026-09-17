@@ -6,6 +6,7 @@ from django.db import transaction
 
 ROLES = {
     "Quanthecy data viewer": [
+        "research.view_evidencesource",
         "operations.view_collection_status",
         "operations.view_raw_payloads",
         "operations.view_rawpayloaddeletion",
@@ -17,6 +18,8 @@ ROLES = {
         "markets.view_ingestioncheckpoint",
     ],
     "Quanthecy data administrator": [
+        "research.view_evidencesource",
+        "research.change_evidencesource",
         "markets.view_researchtopic",
         "markets.add_researchtopic",
         "markets.change_researchtopic",

@@ -16,10 +16,16 @@ from quanthecy.research.schemas import (
     FeedSignal,
     ResearchOverview,
     ReviewOut,
+    SourcePage,
     TimelineOut,
 )
 
 router = Router(tags=["Research"])
+
+
+@router.get("/research/sources", response=SourcePage)
+def sources(request: HttpRequest) -> SourcePage:
+    return services.source_list()
 
 
 @router.get("/research/overview", response=ResearchOverview)
@@ -50,8 +56,9 @@ def evidence(
     search: str = Query("", max_length=200),
     offset: int = Query(0, ge=0, le=10000),
     limit: int = Query(20, ge=1, le=100),
+    kind: Literal["", "OFFICIAL", "MEDIA"] = "",
 ) -> EvidencePage:
-    return services.evidence_list(cutoff, source, search, offset, limit)
+    return services.evidence_list(cutoff, source, search, offset, limit, kind)
 
 
 @router.get("/evidence/{item_id}", response=EvidenceDetail)

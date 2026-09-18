@@ -6,6 +6,12 @@ workspace watchlists with sampled in-app alerts are implemented; see the
 presets and deeper microstructure below remain proposed. This brief extends [product scope](product-scope.md) and
 preserves the architecture and research-only boundary in [AGENTS.md](../AGENTS.md).
 
+The agreed next development priority is broad market data, opportunity discovery,
+and reproducible evaluation for traders, investors, and quantitative researchers.
+Follow the [roadmap's next delivery sequence](roadmap.md#next-delivery-sequence).
+The workflow and layout proposals below support that sequence; their order does
+not defer historical inputs, outcome tracking, or bounded replay/evaluation.
+
 ## Product direction
 
 Quanthecy should help prediction-market traders and event-driven investors answer:

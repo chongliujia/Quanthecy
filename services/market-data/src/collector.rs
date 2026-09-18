@@ -34,17 +34,21 @@ fn setting(name: &str, default: &str) -> String {
 
 impl Collector {
     pub fn from_env() -> Result<Self, Error> {
-        Self::configured(false)
+        Self::configured("")
     }
 
     pub fn catalog_from_env() -> Result<Self, Error> {
-        Self::configured(true)
+        Self::configured("catalog")
     }
 
-    fn configured(catalog: bool) -> Result<Self, Error> {
+    pub fn execution_from_env() -> Result<Self, Error> {
+        Self::configured("execution")
+    }
+
+    fn configured(mode: &str) -> Result<Self, Error> {
         let directory = setting("COLLECTOR_STATE_DIR", "/var/lib/quanthecy");
-        let directory = if catalog {
-            Path::new(&directory).join("catalog")
+        let directory = if !mode.is_empty() {
+            Path::new(&directory).join(mode)
         } else {
             Path::new(&directory).to_owned()
         };
@@ -53,7 +57,7 @@ impl Collector {
             ("polymarket", "POLYMARKET_MARKET_IDS"),
             ("kalshi", "KALSHI_MARKET_TICKERS"),
         ] {
-            if !catalog
+            if mode.is_empty()
                 && let Ok(ids) = env::var(name)
                 && !ids.trim().is_empty()
             {

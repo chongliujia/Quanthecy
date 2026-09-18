@@ -847,3 +847,121 @@ def test_wrong_provider_and_missing_cloud_key_fail_before_enqueuing(actor, organ
     with pytest.raises(ValidationError, match="not served"):
         enqueue(actor, organization.id, uuid4())
     assert not AgentRun.objects.exists()
+
+
+def local_payload(**changes):
+    values = payload()
+    values.update(
+        provider="local",
+        base_url="http://127.0.0.1:8001/v1",
+        model="local-test",
+        context_window_tokens=8192,
+        enable_thinking=False,
+        enabled=True,
+    )
+    values.update(changes)
+    return values
+
+
+def test_local_configuration_requires_trusted_endpoint_and_preserves_tenant_boundary(
+    client, actor, organization, settings
+):
+    values = local_payload()
+    with pytest.raises(ValidationError, match="allowed"):
+        save_configuration(actor, organization.id, ConfigurationInput(**values))
+    settings.AGENT_ALLOWED_ENDPOINTS.append(values["base_url"])
+    settings.AGENT_ENCRYPTION_KEY = ""  # An unauthenticated local model needs no secret storage.
+    path = f"/api/v1/organizations/{organization.id}/agent/configuration"
+    with patch("quanthecy.agents.provider.complete") as provider:
+        response = client.put(path, data=json.dumps(values), content_type="application/json")
+    assert response.status_code == 200
+    assert response.json()["context_window_tokens"] == 8192
+    assert response.json()["enable_thinking"] is False
+    assert not response.json()["has_api_key"]
+    provider.assert_not_called()
+    assert not AgentRun.objects.exists()
+    outsider = User.objects.create_superuser("local-outsider@example.com", "password")
+    client.force_login(outsider)
+    assert client.get(path).status_code == 404
+    assert (
+        client.put(path, data=json.dumps(values), content_type="application/json").status_code
+        == 404
+    )
+
+
+@pytest.mark.parametrize("window", [None, 512, 2000])
+def test_local_output_must_leave_room_for_input(actor, organization, settings, window):
+    values = local_payload(context_window_tokens=window)
+    settings.AGENT_ALLOWED_ENDPOINTS.append(values["base_url"])
+    with pytest.raises(ValidationError, match="context window"):
+        save_configuration(actor, organization.id, ConfigurationInput(**values))
+    assert not ModelConfiguration.objects.filter(organization=organization).exists()
+
+
+def test_local_worker_uses_saved_options_and_long_inference_lease(actor, organization, settings):
+    values = local_payload(enable_thinking=True, api_key="EMPTY")
+    settings.AGENT_ALLOWED_ENDPOINTS.append(values["base_url"])
+    save_configuration(actor, organization.id, ConfigurationInput(**values))
+    run = enqueue(actor, organization.id, uuid4())
+
+    def provider(connection, system, prompt, stopped):
+        assert connection.provider == "local" and connection.enable_thinking is True
+        assert connection.api_key == "EMPTY"
+        assert connection.timeout_seconds == 300
+        run.refresh_from_db()
+        assert (run.lease_expires_at - timezone.now()).total_seconds() > 350
+        return '{"ok":true}', {"total_tokens": 12}
+
+    process_one(Event(), provider)
+    run.refresh_from_db()
+    assert run.state == "SUCCEEDED" and run.usage == {"total_tokens": 12}
+
+
+@pytest.mark.parametrize("api_key", ["", "EMPTY"])
+def test_local_adapter_chat_template_no_proxy_and_optional_auth(api_key):
+    from urllib.request import ProxyHandler
+
+    connection = Connection("local", "http://127.0.0.1:8001/v1", "local-model", api_key, 1024)
+    response = Mock()
+    response.__enter__ = Mock(return_value=response)
+    response.__exit__ = Mock(return_value=None)
+    response.read.return_value = json.dumps(
+        {
+            "choices": [{"finish_reason": "stop", "message": {"content": '{"ok":true}'}}],
+            "usage": {"total_tokens": 12},
+        }
+    ).encode()
+    opener = Mock()
+    opener.open.return_value = response
+    with patch("quanthecy.agents.provider.build_opener", return_value=opener) as build:
+        assert complete(connection, "Return JSON", "Test")[0] == '{"ok":true}'
+    proxy = next(handler for handler in build.call_args.args if isinstance(handler, ProxyHandler))
+    assert proxy.proxies == {}
+    assert any(isinstance(handler, NoRedirect) for handler in build.call_args.args)
+    request = opener.open.call_args.args[0]
+    assert request.full_url == connection.base_url + "/chat/completions"
+    assert request.get_header("Authorization") == ("Bearer EMPTY" if api_key else None)
+    body = json.loads(request.data)
+    assert body["chat_template_kwargs"] == {"enable_thinking": False}
+    assert body["max_tokens"] == 1024 and body["stream"] is False
+    assert body["response_format"] == {"type": "json_object"}
+    assert body["temperature"] == 0.7
+
+
+def test_context_overflow_is_classified_without_disclosing_provider_body():
+    from io import BytesIO
+    from urllib.error import HTTPError
+
+    opener = Mock()
+    opener.open.side_effect = HTTPError(
+        "http://127.0.0.1:8001/v1/chat/completions",
+        400,
+        "Bad request",
+        {},
+        BytesIO(b'{"error":{"message":"maximum context length is 8192; private-input"}}'),
+    )
+    with (
+        patch("quanthecy.agents.provider.build_opener", return_value=opener),
+        pytest.raises(ProviderFailure, match="^provider_context_limit$"),
+    ):
+        complete(Connection("local", "http://127.0.0.1:8001/v1", "local", ""), "JSON", "Test")

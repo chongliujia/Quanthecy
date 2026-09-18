@@ -15,6 +15,8 @@ class ModelConfiguration(models.Model):
     enabled = models.BooleanField(default=False)
     daily_run_limit = models.PositiveIntegerField(default=10)
     max_output_tokens = models.PositiveIntegerField(default=2000)
+    context_window_tokens = models.PositiveIntegerField(null=True, blank=True)
+    enable_thinking = models.BooleanField(default=False)
     revision = models.PositiveIntegerField(default=0)
     updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, on_delete=models.PROTECT)
     updated_at = models.DateTimeField(auto_now=True)

@@ -15,7 +15,7 @@ from quanthecy.organizations.policies import require_org_member, require_org_rol
 from quanthecy.research.services import cutoff_time
 
 from .catalog import DEFAULT_ENDPOINTS
-from .configuration import decrypt_key, endpoint, validate_model_target
+from .configuration import decrypt_key, endpoint, validate_local_limits, validate_model_target
 from .models import AgentRun, ModelConfiguration
 from .schemas import AgentStatus
 
@@ -60,6 +60,11 @@ def status(actor: User, organization_id: UUID) -> AgentStatus:
                 validate_model_target(config.base_url, config.model)
             except ValidationError:
                 issue = "invalid_endpoint"
+            if not issue:
+                try:
+                    validate_local_limits(config)
+                except ValidationError:
+                    issue = "invalid_context_window"
     return AgentStatus(
         enabled=bool(config and config.enabled),
         model=config.model if config else "",
@@ -74,7 +79,7 @@ def status(actor: User, organization_id: UUID) -> AgentStatus:
 def list_runs(actor: User, organization_id: UUID, market_id: UUID | None) -> list[AgentRun]:
     require_org_member(actor, organization_id)
     expire_runs()
-    query = AgentRun.objects.filter(organization_id=organization_id)
+    query = AgentRun.objects.filter(organization_id=organization_id).exclude(kind="PAPER_REVIEW")
     if market_id:
         query = query.filter(market_id=market_id)
     return list(query[:20])
@@ -125,6 +130,7 @@ def enqueue(
         raise ValidationError("Configure and enable a model before requesting research.")
     endpoint(config.base_url, config.provider)
     validate_model_target(config.base_url, config.model)
+    validate_local_limits(config)
     secret = decrypt_key(config)
     if (
         config.provider in {"openai", "anthropic"} or config.base_url in DEFAULT_ENDPOINTS

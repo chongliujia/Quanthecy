@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     "quanthecy.agents",
     "quanthecy.watchlists",
     "quanthecy.alerts",
+    "quanthecy.paper",
 ]
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

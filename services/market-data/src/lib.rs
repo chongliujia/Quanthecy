@@ -5,6 +5,7 @@ use std::sync::LazyLock;
 pub mod adapters;
 pub mod catalog;
 pub mod collector;
+pub mod execution;
 pub mod selection;
 pub mod spool;
 

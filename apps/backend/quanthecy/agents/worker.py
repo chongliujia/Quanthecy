@@ -22,12 +22,14 @@ from quanthecy_analytics.intelligence import (
     stage_input,
     validate_stage,
 )
+from quanthecy_analytics.paper_review import PROMPT as PAPER_PROMPT
+from quanthecy_analytics.paper_review import EntryReview, validate_review
 from quanthecy_analytics.report_validation import ListGrouping, validation_issues
 
 from quanthecy.organizations.models import Organization
 from quanthecy.organizations.policies import require_org_role
 
-from .configuration import decrypt_key, endpoint
+from .configuration import decrypt_key, endpoint, validate_local_limits
 from .context import build_context
 from .models import AgentRun, ModelConfiguration
 from .provider import ERROR_CODES, Connection, ProviderFailure, child_complete
@@ -77,19 +79,25 @@ def live_run(run: AgentRun) -> Any:
 def connection_for(run: AgentRun) -> Connection:
     run.requested_by.refresh_from_db()
     config = ModelConfiguration.objects.get(organization_id=run.organization_id)
-    if config.revision != run.configuration_revision or (
-        run.kind == "RESEARCH" and not config.enabled
-    ):
+    if config.revision != run.configuration_revision or (run.kind != "TEST" and not config.enabled):
         raise ProviderFailure("configuration_changed")
     require_org_role(
-        run.requested_by, run.organization_id, RUN_ROLES if run.kind == "RESEARCH" else {"OWNER"}
+        run.requested_by, run.organization_id, RUN_ROLES if run.kind != "TEST" else {"OWNER"}
     )
+    validate_local_limits(config)
+    if run.kind == "PAPER_REVIEW":
+        from quanthecy.paper.reviews import require_live_review
+
+        require_live_review(run)
     return Connection(
         config.provider,
         endpoint(config.base_url, config.provider),
         config.model,
         decrypt_key(config),
-        min(config.max_output_tokens, 256) if run.kind == "TEST" else config.max_output_tokens,
+        min(config.max_output_tokens, 256 if run.kind == "TEST" else 2048)
+        if run.kind in {"TEST", "PAPER_REVIEW"}
+        else config.max_output_tokens,
+        enable_thinking=config.enable_thinking,
     )
 
 
@@ -123,13 +131,20 @@ def process_one(
         else:
             assert run.market_id is not None
             context = build_context(run.market_id, run.cutoff)
+            if run.kind == "PAPER_REVIEW":
+                from quanthecy.paper.reviews import review_context
+
+                context = review_context(run, context)
             prompt = json.dumps(
                 {
                     "context": {k: v for k, v in context.items() if k != "observations"},
-                    "report_schema": ResearchReport.model_json_schema(),
-                }
+                    "report_schema": (
+                        EntryReview if run.kind == "PAPER_REVIEW" else ResearchReport
+                    ).model_json_schema(),
+                },
+                ensure_ascii=False,
             )
-            system = PROMPT
+            system = PAPER_PROMPT if run.kind == "PAPER_REVIEW" else PROMPT
             system += "\nWrite narrative fields in " + (
                 "Simplified Chinese." if run.language == "zh" else "English."
             )
@@ -214,7 +229,11 @@ def process_one(
         ):
             return True
         phase = "provider"
-        raw, usage = complete(connection, system, prompt, stopped)
+        if run.kind == "PAPER_REVIEW":
+            usage = {"provider_calls": 1}
+            live_run(run).update(usage=usage)
+        raw, tokens = complete(connection, system, prompt, stopped)
+        usage.update(tokens)
         AgentRun.objects.filter(pk=run.pk, lease_token=run.lease_token).update(usage=usage)
         phase = "validation"
         if not live_run(run).update(stage="validating", usage=usage):
@@ -223,6 +242,8 @@ def process_one(
             if json.loads(raw) != {"ok": True}:
                 raise ValueError("Invalid test response")
             report = None
+        elif run.kind == "PAPER_REVIEW":
+            report = validate_review(raw, context).model_dump(mode="json")
         else:
             report = validate_report(raw, context).model_dump(mode="json")
         publish(run, report, usage)

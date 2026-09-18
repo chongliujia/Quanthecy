@@ -245,6 +245,7 @@ A single-server Docker Compose configuration is provided in [compose.prod.yaml](
 | [Research terminal](docs/research-terminal.md) | Chart interactions, model connections, quotas and jobs |
 | [Specialist intelligence team](docs/intelligence-team.md) | Roles, scoped context, reports and validation |
 | [Watchlists and alerts](docs/watchlists-alerts.md) | Workspace lists, rule windows, trigger provenance and worker recovery |
+| [Paper trading lab](docs/paper-trading-v2.md) | Virtual accounts, automatic entry reviews, versioned comparisons and replayable fills |
 | [Data quality](docs/data-quality.md) | Eligibility checks and measurement limits |
 | [Market discovery](docs/market-directory.md) | Paginated directory, bulk selection, collection tiers and settlement checks |
 | [Collection controls](docs/collection-controls.md) | Admin switches, per-source frequency, acknowledgement and recovery |

@@ -28,6 +28,8 @@ pub struct Journal {
     pub catalog_page_id: u64,
     #[serde(default)]
     pub catalog_pending: Option<Value>,
+    #[serde(default)]
+    pub execution_pending: Vec<Value>,
 }
 
 pub struct Spool {

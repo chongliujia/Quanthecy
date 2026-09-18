@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.request import HTTPRedirectHandler, Request, build_opener
+from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 ERROR_CODES = frozenset(
     {
@@ -19,6 +19,7 @@ ERROR_CODES = frozenset(
         "provider_unavailable",
         "provider_output_limit",
         "provider_invalid_response",
+        "provider_context_limit",
     }
 )
 
@@ -41,10 +42,11 @@ class Connection:
     model: str
     api_key: str = field(repr=False)
     max_output_tokens: int = 2000
+    enable_thinking: bool = False
 
     @property
     def timeout_seconds(self) -> int:
-        return 300 if self.max_output_tokens > 8000 else 40
+        return 300 if self.provider == "local" or self.max_output_tokens > 8000 else 40
 
     @property
     def deadline_seconds(self) -> int:
@@ -70,6 +72,9 @@ def complete(connection: Connection, system: str, prompt: str) -> tuple[str, dic
         "stream": False,
     }
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
+    if connection.provider == "local":
+        body["chat_template_kwargs"] = {"enable_thinking": connection.enable_thinking}
+        body["temperature"] = 0.7
     if connection.api_key:
         headers["Authorization"] = f"Bearer {connection.api_key}"
     route = "/chat/completions"
@@ -93,9 +98,13 @@ def complete(connection: Connection, system: str, prompt: str) -> tuple[str, dic
         method="POST",
     )
     try:
-        with build_opener(NoRedirect()).open(
-            request, timeout=connection.timeout_seconds
-        ) as response:
+        # Local evidence must not be routed through an ambient HTTP(S) proxy.
+        opener = (
+            build_opener(ProxyHandler({}), NoRedirect())
+            if connection.provider == "local"
+            else build_opener(NoRedirect())
+        )
+        with opener.open(request, timeout=connection.timeout_seconds) as response:
             raw = response.read(connection.max_response_bytes + 1)
         if len(raw) > connection.max_response_bytes:
             raise ProviderFailure("provider_failed")
@@ -143,6 +152,23 @@ def complete(connection: Connection, system: str, prompt: str) -> tuple[str, dic
             408: "provider_timeout",
             429: "provider_rate_limit",
         }.get(exc.code, "provider_unavailable" if exc.code >= 500 else "provider_failed")
+        if exc.code == 400:
+            # Read a bounded diagnostic solely to classify context exhaustion. Never
+            # persist or return the response body, which can contain input or secrets.
+            try:
+                diagnostic = exc.read(8192).decode("utf-8", errors="replace").lower()
+                if any(
+                    marker in diagnostic
+                    for marker in (
+                        "context_length_exceeded",
+                        "maximum context length",
+                        "context window",
+                        "max_model_len",
+                    )
+                ):
+                    code = "provider_context_limit"
+            except (OSError, ValueError):
+                pass
         exc.close()
         raise ProviderFailure(code) from None
     except TimeoutError:

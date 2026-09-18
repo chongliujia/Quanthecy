@@ -12,6 +12,7 @@ const EventPages = lazy(() => import('./EventPages'))
 const ModelSettings = lazy(() => import('./ModelSettings'))
 const MarketExplorer = lazy(() => import('./MarketExplorer'))
 const WatchlistsPage = lazy(() => import('./WatchlistsPage'))
+const PaperLab = lazy(() => import('./PaperLab'))
 
 function AuthForm() {
   const client = useQueryClient()
@@ -58,6 +59,7 @@ function Workspace({ user }: { user: User }) {
   const [navCollapsed, setNavCollapsed] = useLayoutPreference(`quanthecy.nav.${user.id}`, true, (value): value is boolean => typeof value === 'boolean')
   const cutoff = route.params.get('cutoff') ?? ''
   const navigation = [['overview', t("Research overview"), '01'], ['watchlists', t('Watchlists & alerts'), '09'], ['markets', t("Market explorer"), '02'], ['signals', t("Signal feed"), '03'], ['comparisons', t("Cross-platform"), '04'], ['evidence', t("News & evidence"), '05'], ['events', t('Event dossiers'), '08'], ['workspace', t("Workspace & members"), '06'], ['model-settings', t("Model settings"), '07']]
+  navigation.splice(2, 0, ['paper', t('Paper trading lab'), '10'])
   const heading = navigation.find(([path]) => path === route.page)?.[1] ?? t("Page not found")
   const organizations = useQuery({ queryKey: ['organizations', user.id], queryFn: () => api<Organization[]>('/organizations?limit=100') })
   const active = organizations.data?.find((org) => org.id === selected) ?? organizations.data?.[0]
@@ -93,6 +95,7 @@ function Workspace({ user }: { user: User }) {
       {organizations.data?.length === 0 && <p>{t("Create a workspace to begin organizing your research.")}</p>}
       {route.page === 'overview' && <ResearchOverview userId={user.id} />}
       {route.page === 'watchlists' && <Suspense fallback={<p role="status">{t('Loading watchlists…')}</p>}><WatchlistsPage userId={user.id} organization={active} /></Suspense>}
+      {route.page === 'paper' && <Suspense fallback={<p role="status">{t('Loading paper accounts…')}</p>}><PaperLab userId={user.id} organization={active} /></Suspense>}
       {route.page === 'markets' && <Suspense fallback={<p role="status">{t("Loading market explorer…")}</p>}><MarketExplorer key={active?.id} organization={active} watchlistId={route.params.get('watchlist') ?? ''} cutoff={cutoff} userId={user.id} selectedId={route.id ?? null} onSelect={(id) => navigate(id ? `/markets/${id}` : '/markets')} /></Suspense>}
       {route.page === 'model-settings' && <Suspense fallback={<p role="status">{t("Loading model settings…")}</p>}><ModelSettings key={active?.id} userId={user.id} organization={active} /></Suspense>}
       {route.page === 'events' && <Suspense fallback={<p role="status">{t('Loading event research…')}</p>}><EventPages key={`${route.id}-${cutoff}`} userId={user.id} slug={route.id} cutoff={cutoff} /></Suspense>}

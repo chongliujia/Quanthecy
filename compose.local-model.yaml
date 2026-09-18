@@ -1,0 +1,18 @@
+# Optional Linux override for a model server listening on host loopback.
+# Include after compose.yaml (and any existing proxy override), or merge these
+# entries into an ignored compose.override.yaml. The model stays bound to localhost.
+services:
+  postgres:
+    ports: ['127.0.0.1:15432:5432']
+  clickhouse:
+    ports: ['127.0.0.1:18124:8123']
+  redis:
+    ports: ['127.0.0.1:16380:6379']
+  agent-worker:
+    network_mode: host
+    networks: !reset []
+    environment:
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: '15432'
+      CLICKHOUSE_URL: http://127.0.0.1:18124
+      REDIS_URL: redis://127.0.0.1:16380/0

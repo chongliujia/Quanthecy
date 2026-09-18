@@ -37,7 +37,11 @@ def repository():
         url=admin.url, database=database, user=admin.user, password=admin.password
     )
     try:
-        assert migrate(repo) == ["0001_market_history", "0002_market_catalog"]
+        assert migrate(repo) == [
+            "0001_market_history",
+            "0002_market_catalog",
+            "0003_execution_quotes",
+        ]
         assert migrate(repo) == []
         yield repo
     finally:
@@ -263,10 +267,76 @@ def test_catalog_page_replay_reconciles_once_without_price_history(repository):
     for _ in range(2):
         repository.execute(
             "INSERT INTO market_catalog_pages SETTINGS date_time_input_format='best_effort' "
-            "FORMAT JSONEachRow\n"
-            + json.dumps(row)
+            "FORMAT JSONEachRow\n" + json.dumps(row)
         )
     assert run_catalog_ingestion(repository) == 1
     assert run_catalog_ingestion(repository) == 0
     assert CatalogMarket.objects.count() == 1
     assert not Market.objects.exists()
+
+
+def test_paper_execution_quotes_are_deduplicated_and_cannot_see_future_data(repository):
+    from quanthecy.paper.repository import ExecutionRepository
+    from quanthecy_analytics.paper import ExecutionQuote
+
+    now = datetime(2026, 9, 18, 12, tzinfo=UTC)
+    mid = uuid4()
+    q = ExecutionQuote(
+        schema_version=1,
+        quote_id=uuid4(),
+        market_id=mid,
+        platform="polymarket",
+        exchange_id="123",
+        outcome_id="456",
+        received_at=now - timedelta(seconds=10),
+        recorded_at=now - timedelta(seconds=10),
+        metadata_at=now - timedelta(seconds=10),
+        source_at=None,
+        status="OPEN",
+        settlement=None,
+        bids=[{"price": "0.49", "size": "100"}],
+        asks=[{"price": "0.50", "size": "100"}],
+        fee_rate="0",
+        fee_model="polymarket_quadratic",
+        fee_source="fixture",
+        source="fixture",
+    )
+
+    def insert(quote):
+        row = dict(
+            quote_id=str(quote.quote_id),
+            market_id=str(mid),
+            platform=quote.platform,
+            received_at=quote.received_at.isoformat(),
+            envelope=quote.model_dump_json(),
+        )
+        repository.execute(
+            "INSERT INTO execution_quotes SETTINGS date_time_input_format='best_effort' "
+            "FORMAT JSONEachRow\n"
+            + json.dumps(row)
+        )
+
+    insert(q)
+    insert(q)
+    reader = ExecutionRepository(repository)
+    assert reader.latest([mid], now)[mid].quote_id == q.quote_id
+    assert repository.rows("SELECT count() AS n FROM execution_quotes FINAL")[0]["n"] == 1
+    future = q.model_copy(
+        update={
+            "quote_id": uuid4(),
+            "received_at": now + timedelta(seconds=2),
+            "recorded_at": now + timedelta(seconds=2),
+        }
+    )
+    insert(future)
+    assert reader.latest([mid], now)[mid].quote_id == q.quote_id
+    assert reader.latest([mid], now + timedelta(seconds=3))[mid].quote_id == future.quote_id
+    delayed = q.model_copy(
+        update={
+            "quote_id": uuid4(),
+            "received_at": now - timedelta(seconds=1),
+            "recorded_at": now + timedelta(seconds=5),
+        }
+    )
+    insert(delayed)
+    assert reader.latest([mid], now) == {}  # Fail closed if persistence is in the future.

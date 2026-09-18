@@ -143,12 +143,13 @@ Models start disabled. In **Model settings**, the active workspace's OWNER can s
 - API base URL and exact model ID;
 - optional API key (required for OpenAI), replacement or removal;
 - daily request limit and maximum output tokens;
+- local/offline Chat Completions, optional authentication, context window and thinking mode;
 - whether workspace members can request on-demand research.
 
 Saving configuration does not contact the provider. **Send test request** explicitly
 queues one small JSON generation, even while research is disabled, and may incur
 the provider's charge. It contains no research context. Research requests are also
-explicit button actions. No live or paid model was used to verify this feature.
+explicit button actions. Unit tests use mocked providers or a local stub.
 
 Only owners may change/test connections. OWNER, ADMIN, and MEMBER may request
 research when enabled; VIEWER may read reports. Every API query constrains the
@@ -193,6 +194,62 @@ compatible protocol uses `max_tokens`. Anthropic uses `POST {base_url}/messages`
 a separate system prompt and API version header. Text must pass the same JSON
 schema and evidence checks. These are protocol adapters, not a claim that every
 model or account was tested against a live provider.
+
+### Local / offline inference
+
+Choose **Local / offline model** in Model settings, enter the model server's base
+URL (including `/v1`) and exact served model ID. No API key is required for a server
+without authentication. A placeholder such as `EMPTY` can be saved if needed;
+nonempty keys use the same encrypted storage as other connections. Moving from a
+cloud endpoint still requires explicitly replacing or removing its saved key.
+
+Local requests go directly to `POST {base_url}/chat/completions`, ignoring ambient
+proxy variables and refusing redirects. They use `max_tokens`, `temperature: 0.7`,
+JSON object mode, `stream: false`, and
+`chat_template_kwargs: {"enable_thinking": false}` by default. The thinking switch
+controls that last boolean. Text is read from `choices[0].message.content`; the
+normal report and reference validation remains in effect. The model server must
+support these parameters. Local requests have a five-minute inference timeout.
+
+Set **Context window tokens** to the actual server limit. Input and output share
+this window, so the output allowance must be smaller. The server's tokenizer
+enforces the combined input/output limit; this UI setting does not retokenize or
+truncate evidence and cannot increase the server limit. Oversized requests fail
+with a specific context-window message. Large research contexts, especially later
+team stages, may need a larger-context model or a lower output allowance.
+
+Example for a local server configured with an 8,192-token window:
+
+| Setting | Value |
+| --- | --- |
+| Provider | Local / offline model |
+| Base URL | `http://127.0.0.1:8001/v1` |
+| Model | `huihui-qwen3.8-27b` |
+| API key | `EMPTY` (or blank when no authentication is required) |
+| Context window | 8192 |
+| Maximum output | 2048 |
+| Thinking mode | Off |
+
+The operator must add the exact base URL to `AGENT_ALLOWED_ENDPOINTS`, preserving
+any other endpoints that should remain available, then recreate the backend and
+Agent worker to load the environment. Selecting local inference does not relax
+this allowlist or organization permissions.
+
+For Linux Docker with a model bound only to the host's `127.0.0.1`, use the optional
+[`compose.local-model.yaml`](../compose.local-model.yaml) override. It gives only
+the Agent worker host networking and connects its storage clients through
+loopback-published database ports. Keep existing proxy overrides where applicable:
+
+```sh
+docker compose -f compose.yaml -f compose.override.yaml -f compose.local-model.yaml up -d --build --wait
+```
+
+Omit `-f compose.override.yaml` if that file does not exist. Alternatively merge
+the local-model entries into the ignored local override so ordinary `docker
+compose up` preserves them. If the database loopback ports differ, adjust the
+override accordingly. The model service remains bound to the host; the browser
+never contacts it directly. Market/news ingestion continues using its own network
+configuration. "Offline" describes model inference, not exchange data collection.
 
 Changing providers requires a replacement credential or explicit removal; the UI
 does not silently delete the saved key. Cloud presets cannot be enabled without a

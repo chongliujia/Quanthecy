@@ -1,9 +1,10 @@
 import { t } from './i18n'
 export type ModelConfiguration = {
-  revision: number; provider: 'openai' | 'openai_compatible' | 'anthropic'; base_url: string; model: string;
+  revision: number; provider: 'openai' | 'openai_compatible' | 'anthropic' | 'local'; base_url: string; model: string;
   has_api_key: boolean; encryption_available: boolean; enabled: boolean;
   daily_run_limit: number; max_output_tokens: number; allowed_endpoints: string[];
   max_output_tokens_limit?: number;
+  context_window_tokens: number | null; enable_thinking: boolean;
 }
 export type AgentStatus = { enabled: boolean; model: string; can_manage: boolean; can_run: boolean; runs_today: number; daily_run_limit: number; configuration_issue?: string }
 export type Claim = { kind: 'OBSERVATION' | 'HYPOTHESIS' | 'EXPLANATION'; text: string; references: string[] }
@@ -27,6 +28,7 @@ export function runError(code: string) {
     provider_network: 'The server could not connect to the model provider. Check server connectivity or proxy settings.',
     provider_unavailable: 'The model provider is temporarily unavailable (5xx). Try again later.',
     provider_output_limit: 'The model reached the output token limit. Increase the limit or use a model with a shorter response.',
+    provider_context_limit: 'The input and output exceed this model’s context window. Lower the output allowance or use a model with a larger context. Evidence was not silently truncated.',
     provider_invalid_response: 'The provider returned an unsupported response. Check the API protocol and JSON output support.',
     provider_failed: 'The model request failed. Check the endpoint, model and credentials in Model settings.',
     invalid_report: 'The response failed report or evidence validation. No report was published.',

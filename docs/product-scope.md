@@ -1,32 +1,42 @@
 # Product scope
 
-Status: planning baseline following the product discussion. This document records
-the agreed direction; detailed contracts and thresholds remain implementation
-work. It complements the architecture boundaries in [AGENTS.md](../AGENTS.md).
+Status: product direction updated on 2026-09-17. The next development priority is
+broad market data, opportunity discovery, and reproducible evaluation. Planned
+capabilities below are not claims of shipped functionality; see the
+[roadmap](roadmap.md) for implementation status. The architecture boundaries in
+[AGENTS.md](../AGENTS.md) remain unchanged.
 
 ## Audience and purpose
 
-Quanthecy primarily serves prediction-market traders and event-driven investors.
-Traders need to monitor selected contracts, identify meaningful changes, and check
-the data behind a signal. Investors need to follow events, compare contract rules,
-review evidence, and revisit their research assumptions. Quantitative researchers
-also need inspectable inputs and reproducible calculations.
+Quanthecy serves prediction-market traders, investors, and quantitative researchers.
+Its purpose is to use broad market data and external evidence to discover potential
+pricing discrepancies and determine whether they offer a reproducible advantage
+relative to contemporaneous market benchmarks, accounting for costs and liquidity.
 
-These audiences share one research platform and organization model. The proposed
-next iteration is described in [Trader and investor experience](trader-investor-experience.md);
-its roadmap items are not claims of shipped functionality.
+Traders need timely candidates and inspectable quotes, depth, and activity.
+Investors need event probabilities, contract rules, evidence, and conditions that
+would change their assessment. Quantitative researchers need historical datasets,
+features, replay, and evaluation. These are views over a shared research foundation.
+
+These audiences share one platform and organization model. The
+[trader and investor experience](trader-investor-experience.md) describes the
+customer workflow; the roadmap sets the delivery order.
 
 The main workflow is:
 
-1. Discover an unusual market movement.
-2. Inspect price, volume, spread, and data quality.
-3. Compare an equivalent or related market on another platform.
-4. Review relevant news, announcements, and their timing.
-5. Read or request an Agent research report.
-6. Export the observations and reproduce the deterministic analysis.
+1. Discover markets and organize events and their related contracts.
+2. Collect and align observations, rules, external evidence, and outcomes.
+3. Scan for candidate discrepancies using explicit, versioned hypotheses.
+4. Inspect supporting and conflicting evidence, quotes, costs, and data quality.
+5. Use deterministic analysis and optional Agent interpretation to support a decision.
+6. Track subsequent prices and settlement outcomes against the frozen candidate.
+7. Reproduce and evaluate the method on independent events and later time periods.
 
-The three research modules below are all part of the MVP. Milestones describe
-implementation order; completion of one module alone is not the complete MVP.
+An event and its related contracts are the central research unit. Research horizons
+follow information arrival, contract structure, and lifecycle; the product does not
+impose one short-term or long-term horizon across all categories. Forecast accuracy,
+cost-adjusted returns, drawdown, and capital duration are distinct measurements.
+An unusual price, high win rate, or valid Agent report alone does not establish an edge.
 
 ## Research modules
 
@@ -46,9 +56,42 @@ For event research, distinguish temporal association, a proposed explanation,
 and an explanation supported by external evidence. Preserve conflicting evidence
 and make uncertain market associations visible.
 
+## Opportunity discovery and evaluation
+
+The next iteration prioritizes three candidate families:
+
+| Family | Research question | Required controls |
+| --- | --- | --- |
+| Related-contract consistency | Are threshold, mutually exclusive, or time-related contracts priced consistently? | Reviewed logical relationships, matching units/sources/times, completeness of outcome sets where required |
+| Cross-platform discrepancies | Do equivalent outcomes have materially different quotes? | Reviewed settlement equivalence, synchronized quotes, available depth, and applicable costs |
+| Event-information response | How do related prices respond after new information becomes available? | Publication and observation times, evidence revisions, association review, and comparable historical events |
+
+Each family is a research hypothesis until evaluated. Conditional calibration by
+category, price range, event horizon, and liquidity supplies a benchmark for
+subsequent probability models. No universal price bias or profitable strategy is
+assumed. Unsupported relationships or unavailable depth remain explicit limitations.
+
+Save a candidate's detection time, event/contracts, hypothesis and version, input
+references, available quotes, horizon, benchmark, costs/assumptions, and invalidation
+conditions. Keep later outcomes separate from information available at detection.
+Record unsuccessful candidates and excluded observations as well as successes.
+
+Evaluation must distinguish probability forecasts from forecasts of subsequent
+price movement. Compare probability forecasts with contemporaneous market forecasts
+using calibration and proper scores; compare simulated trading outcomes using stated
+entry/exit rules, spreads, fees, slippage, fills, and capital duration. Unknown
+execution inputs cannot establish an executable return.
+
+Use chronological development and held-out periods, group related contracts by
+underlying event, and disclose sample counts, uncertainty, exclusions, and the
+number of hypotheses tried. Repeated observations of one event are not independent
+outcomes. Preserve a forward observation period after freezing the method. A
+reproducible negative result is useful; evaluation infrastructure must not depend
+on finding a positive return.
+
 ## Automated research
 
-The MVP includes:
+The planned automated workflow includes:
 
 - Analysis triggered by deterministic signals.
 - One scheduled daily research digest per enabled organization configuration.
@@ -57,13 +100,16 @@ The MVP includes:
   and analysis budgets.
 - An in-app research feed with evidence links and run status.
 
-One Agent uses bounded, read-only research tools. Python computes numerical
-metrics before the Agent interprets them. See [automated research](automated-research.md)
-for the proposed execution design.
+On-demand single-Agent and five-stage expert research already exist. Automatic
+triggers and digests remain planned and follow the data and evaluation priorities.
+Agents interpret evidence, propose hypotheses, and examine counterarguments;
+Python computes metrics, replay, and evaluation. Model confidence is not a
+calibrated probability or an independently validated edge. See
+[automated research](automated-research.md) for the execution design.
 
 ## Research data requirements
 
-Before collector implementation, define a versioned contract covering:
+Extend the existing versioned observation contract and repositories to cover:
 
 - **Identity:** internal IDs and exchange identifiers for events, markets, and
   outcomes/contracts; relationships among them; outcome-specific observations.
@@ -76,6 +122,13 @@ Before collector implementation, define a versioned contract covering:
   historical backfill provenance. Missing values remain explicit.
 - **Lifecycle:** open and closed markets, resolution state, and versioned market
   rules. Research queries must be able to include closed markets.
+- **Outcomes:** sourced settlement results and revisions, payout values, exceptional
+  settlement states, and the time each result became available. Do not reconstruct
+  labels from a final price alone.
+- **Event relationships:** reviewed equivalence, implication, exclusivity, and
+  temporal relationships, including their rule versions and validity periods.
+- **Event timing:** distinguish scheduled and actual information releases, event
+  occurrence, trading close, outcome determination, and payout when available.
 - **Evidence:** stable references, original URLs, source publication time,
   first observation time, and document revisions with content hashes.
 
@@ -89,6 +142,13 @@ immutable dataset version, calculation version, parameters, and quality flags.
 Versioned inputs must remain available for the advertised reproducibility period.
 Declare any limits caused by source access or retention.
 
+Broaden discovery while collecting at different depths according to research need.
+Track supported and excluded contract types, observed coverage, independent event
+counts, history availability, spreads/depth, and sampling continuity by category.
+Collection frequency must meet the selected method's requirements; a discovered
+or collected market is not automatically eligible for every analysis. Validate
+source access, history availability, and operating cost before increasing volume.
+
 ## Research access and presentation
 
 Initial product views:
@@ -99,6 +159,9 @@ Initial product views:
 - News/event timeline linking market observations to source evidence.
 - Organization research feed, report detail, and daily digest.
 - Workspace settings, basic watchlists, and automatic-analysis settings.
+- Candidate opportunities with supporting/conflicting evidence, validation status,
+  quote freshness, cost assumptions, and links to reproducible inputs and outcomes.
+- Dataset exports and evaluation records for quantitative research.
 
 Readable summaries link to technical details. Historical APIs and CSV/Parquet
 exports use the same metric definitions as the dashboard. An executable notebook
@@ -120,16 +183,23 @@ billing ownership for future work. Django Admin is the operator interface.
 
 ## Completion and later work
 
-The MVP is complete when a user can follow the full research workflow on both
-exchanges, inspect a reviewed comparison and a source-linked event timeline,
-receive automatic analysis and a daily digest, and reproduce a signal from an
-export. Deployment and recovery must meet the [roadmap](roadmap.md) checks.
+The next milestone delivers a bounded, documented dataset; reproducible candidate
+records; and an evaluation of a predeclared method against its benchmark, with
+later observations tracked separately. The evaluation may find no usable edge.
+Its purpose is to make that determination inspectable and repeatable.
 
-Later enhancements include broad automatic market matching, larger source
-coverage, advanced backtesting, richer tracking policies, and additional delivery
-channels. Full billing, enterprise SSO, complex multi-Agent systems, and automatic
-trading remain outside this MVP.
+The broader MVP combines this discovery/evaluation loop with the research workflow
+on both exchanges, reviewed comparisons, source-linked timelines, and the planned
+automatic research and digest workflow. Deployment and recovery must meet the
+[roadmap](roadmap.md) checks.
 
-Before live integration, select the initial market universe, news sources,
-historical coverage target, retention period, LLM provider, and operating budget.
-These choices remain open; this document makes no live API availability claims.
+Broad data coverage and a bounded replay/evaluation capability are near-term
+priorities. Later enhancements include broad automatic semantic matching, more
+advanced execution simulation, richer tracking policies, and additional delivery
+channels. Full billing, enterprise SSO, and automatic trading remain outside this
+MVP; further Agent complexity requires evidence of incremental research value.
+
+For each expansion, record the market universe, source coverage, historical target,
+retention, and operating budget. Choose initial research families using measured
+data readiness and market characteristics. Existing macro/rates support provides a
+starting sample, not evidence that this category offers the best opportunities.

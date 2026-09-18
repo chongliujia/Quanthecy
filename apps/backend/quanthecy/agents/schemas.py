@@ -12,6 +12,7 @@ from quanthecy_analytics.intelligence import (
     SpecialistOutput,
     Workflow,
 )
+from quanthecy_analytics.paper_review import EntryReview
 from quanthecy_analytics.report_validation import ListGrouping, ValidationIssue
 
 from quanthecy.api.schemas import InputSchema
@@ -19,7 +20,7 @@ from quanthecy.api.schemas import InputSchema
 
 class ConfigurationInput(InputSchema):
     revision: int = Field(ge=0)
-    provider: Literal["openai", "openai_compatible", "anthropic"]
+    provider: Literal["openai", "openai_compatible", "anthropic", "local"]
     base_url: str = Field(min_length=1, max_length=500)
     model: str = Field(max_length=160)
     api_key: SecretStr | None = None
@@ -27,6 +28,8 @@ class ConfigurationInput(InputSchema):
     enabled: bool
     daily_run_limit: int = Field(ge=1, le=100)
     max_output_tokens: int = Field(ge=256, le=65536)
+    context_window_tokens: int | None = Field(default=None, ge=512, le=1048576)
+    enable_thinking: bool = False
 
 
 class ConfigurationOut(Schema):
@@ -39,6 +42,8 @@ class ConfigurationOut(Schema):
     enabled: bool
     daily_run_limit: int
     max_output_tokens: int
+    context_window_tokens: int | None
+    enable_thinking: bool
     allowed_endpoints: list[str]
     max_output_tokens_limit: int = 65536
 
@@ -114,7 +119,7 @@ class RunOut(Schema):
     language: str
     reserved_calls: int
     steps: list[StageOut]
-    report: IntelligenceReport | ResearchReport | None
+    report: IntelligenceReport | ResearchReport | EntryReview | None
     usage: dict[str, Any]
     error_code: str
     validation_errors: list[ValidationIssue]

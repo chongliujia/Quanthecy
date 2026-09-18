@@ -60,6 +60,15 @@ def validate_model_target(base_url: str, model: str) -> None:
         )
 
 
+def validate_local_limits(config: ModelConfiguration) -> None:
+    if config.provider == "local" and (
+        config.context_window_tokens is None
+        or not 512 <= config.context_window_tokens <= 1048576
+        or config.max_output_tokens >= config.context_window_tokens
+    ):
+        raise ValidationError("Set the local model context window above the maximum output tokens.")
+
+
 def decrypt_key(config: ModelConfiguration) -> str:
     if not config.encrypted_api_key:
         return ""
@@ -82,6 +91,8 @@ def configuration_value(config: ModelConfiguration) -> ConfigurationOut:
         enabled=config.enabled,
         daily_run_limit=config.daily_run_limit,
         max_output_tokens=config.max_output_tokens,
+        context_window_tokens=config.context_window_tokens,
+        enable_thinking=config.enable_thinking,
         allowed_endpoints=settings.AGENT_ALLOWED_ENDPOINTS,
     )
 
@@ -125,6 +136,9 @@ def save_configuration(
     config.enabled = payload.enabled
     config.daily_run_limit = payload.daily_run_limit
     config.max_output_tokens = payload.max_output_tokens
+    config.context_window_tokens = payload.context_window_tokens
+    config.enable_thinking = payload.enable_thinking
+    validate_local_limits(config)
     if config.enabled and not config.model:
         raise ValidationError("A model ID is required before enabling research.")
     if (

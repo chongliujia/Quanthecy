@@ -30,6 +30,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
         catalog,
         receiver.clone(),
     ));
+    let execution = Collector::execution_from_env().map_err(|e| e.to_string())?;
+    let execution_task = tokio::spawn(quanthecy_market_data::execution::run(
+        execution,
+        receiver.clone(),
+    ));
     let task = tokio::spawn(collector.run(state.clone(), receiver));
     let app = Router::new()
         .route("/health", get(|| async { Json(json!({"status": "ok"})) }))
@@ -45,6 +50,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let _ = stop.send(true);
     task.await?;
     catalog_task.await?;
+    execution_task.await?;
     info!(service = "market-data", "shutdown complete");
     Ok(())
 }

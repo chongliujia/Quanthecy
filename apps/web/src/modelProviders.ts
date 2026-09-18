@@ -1,7 +1,8 @@
 import type { ModelConfiguration } from './agentTypes'
 
-export type ProviderPreset = { id: string; name: string; short: string; protocol: ModelConfiguration['provider']; url: string; docs: string }
+export type ProviderPreset = { id: string; name: string; short: string; protocol: ModelConfiguration['provider']; url: string; docs?: string }
 export const modelProviders: ProviderPreset[] = [
+  { id: 'local', name: 'Local / offline model', short: 'L', protocol: 'local', url: 'http://127.0.0.1:8001/v1' },
   { id: 'openai', name: 'OpenAI', short: 'O', protocol: 'openai', url: 'https://api.openai.com/v1', docs: 'https://platform.openai.com/docs/models' },
   { id: 'deepseek', name: 'DeepSeek', short: 'D', protocol: 'openai_compatible', url: 'https://api.deepseek.com', docs: 'https://api-docs.deepseek.com' },
   { id: 'qwen', name: 'Qwen · China', short: 'Q', protocol: 'openai_compatible', url: 'https://dashscope.aliyuncs.com/compatible-mode/v1', docs: 'https://help.aliyun.com/en/model-studio/base-url' },
@@ -16,5 +17,5 @@ export const modelProviders: ProviderPreset[] = [
 
 export function findModelProvider(url: string) {
   const address = url.replace(/\/$/, '')
-  return modelProviders.find((item) => item.url === address || (item.id === 'deepseek' && address === 'https://api.deepseek.com/v1'))
+  return modelProviders.find((item) => item.id !== 'local' && (item.url === address || (item.id === 'deepseek' && address === 'https://api.deepseek.com/v1')))
 }

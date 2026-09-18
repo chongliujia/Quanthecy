@@ -52,6 +52,11 @@ class AgentRun(models.Model):
     usage = models.JSONField(default=dict)
     error_code = models.CharField(max_length=80, blank=True)
     validation_errors = models.JSONField(default=list)
+    assistant = models.ForeignKey("Assistant", null=True, on_delete=models.PROTECT)
+    assistant_version = models.ForeignKey("AssistantVersion", null=True, on_delete=models.PROTECT)
+    assistant_graph = models.JSONField(null=True)
+    assistant_graph_hash = models.CharField(max_length=64, blank=True)
+    assistant_name = models.CharField(max_length=160, blank=True)
     lease_token = models.UUIDField(null=True)
     lease_expires_at = models.DateTimeField(null=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -76,4 +81,45 @@ class AgentRun(models.Model):
                 ),
                 name="agent_valid_state",
             ),
+        ]
+
+
+class Assistant(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    organization = models.ForeignKey("organizations.Organization", on_delete=models.PROTECT)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    name = models.CharField(max_length=120)
+    draft = models.JSONField(default=dict)
+    revision = models.PositiveIntegerField(default=1)
+    is_default = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization"],
+                condition=models.Q(is_default=True),
+                name="assistant_default_per_org",
+            )
+        ]
+
+
+class AssistantVersion(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    assistant = models.ForeignKey(Assistant, on_delete=models.PROTECT, related_name="versions")
+    number = models.PositiveIntegerField()
+    name = models.CharField(max_length=120)
+    graph = models.JSONField()
+    graph_hash = models.CharField(max_length=64)
+    runtime_version = models.CharField(max_length=40)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["assistant", "number"],
+                name="assistant_version_unique",
+            )
         ]

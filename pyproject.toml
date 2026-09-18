@@ -15,6 +15,7 @@ dependencies = [
   "jsonschema[format]>=4.23,<5",
   "polars>=1.30,<2",
   "defusedxml>=0.7.1,<1",
+  "langgraph>=1.2.11,<2",
 ]
 
 [dependency-groups]

@@ -10,6 +10,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from quanthecy_analytics.assistant import EXPERIMENT_VERSION as ASSISTANT_EXPERIMENT
 from quanthecy_analytics.paper import VERSION
 from quanthecy_analytics.paper_review import EXPERIMENT_VERSION
 from redis import Redis
@@ -100,12 +101,26 @@ def create_experiment(
     version: str = VERSION,
     upgrade: bool = False,
     daily_review_limit: int = 10,
+    assistant_version_ids: list[UUID] | None = None,
 ) -> Experiment:
     require_org_role(actor, organization_id, {"OWNER", "ADMIN", "MEMBER"})
+    from quanthecy_analytics.assistant import AssistantGraph
+
+    from quanthecy.agents.assistants import default_version, validate
+    from quanthecy.agents.models import AssistantVersion
+    from quanthecy.organizations.models import Organization
+
+    Organization.objects.select_for_update().get(pk=organization_id)
     lock_plan()  # Serializes the globally bounded execution universe across workspaces.
-    if version not in {VERSION, EXPERIMENT_VERSION} or not 1 <= daily_review_limit <= 20:
+    if (
+        version not in {VERSION, EXPERIMENT_VERSION, ASSISTANT_EXPERIMENT}
+        or not 1 <= daily_review_limit <= 20
+    ):
         raise ValidationError("Unknown experiment version or invalid review limit.")
-    if Experiment.objects.filter(organization_id=organization_id, version=version).exists():
+    if (
+        version != ASSISTANT_EXPERIMENT
+        and Experiment.objects.filter(organization_id=organization_id, version=version).exists()
+    ):
         raise ValidationError("This workspace already has a paper experiment.")
     previous = (
         Experiment.objects.select_for_update()
@@ -113,10 +128,27 @@ def create_experiment(
         .order_by("-created_at", "-version", "-id")
         .first()
     )
-    if previous and not upgrade:
+    if previous and not upgrade and version != ASSISTANT_EXPERIMENT:
         raise ValidationError("Use the upgrade action to preserve the previous experiment.")
     if upgrade and (not previous or previous.version != VERSION or version != EXPERIMENT_VERSION):
         raise ValidationError("Only a v1 experiment can be upgraded to v2.")
+    versions: list[AssistantVersion] = []
+    if version == ASSISTANT_EXPERIMENT:
+        selected = assistant_version_ids or []
+        if len(selected) > 3 or len(set(selected)) != len(selected):
+            raise ValidationError("Select up to three different published assistant versions.")
+        versions = list(
+            AssistantVersion.objects.filter(
+                id__in=selected,
+                assistant__organization_id=organization_id,
+            ).select_related("assistant")
+        )
+        if len(versions) != len(selected):
+            raise ValidationError("A selected assistant version is unavailable in this workspace.")
+        default = default_version(actor, organization_id)
+        versions = [default] + [v for v in versions if v.id != default.id]
+        for v in versions:
+            validate(AssistantGraph.model_validate(v.graph))
     if Experiment.objects.count() >= 100:
         raise ValidationError("The paper worker supports at most 100 experiments.")
     if not 1 <= len(ids) <= 20 or len(set(ids)) != len(ids):
@@ -125,7 +157,7 @@ def create_experiment(
         raise ValidationError("Virtual capital must be between 100 and 1,000,000.")
     allowed = (
         set(previous.universe.values_list("market_id", flat=True))
-        if upgrade and previous
+        if (upgrade or version == ASSISTANT_EXPERIMENT) and previous
         else {row["id"] for row in candidates(actor, organization_id)}
     )
     if not set(ids) <= allowed:
@@ -140,8 +172,21 @@ def create_experiment(
         Order.objects.filter(account__experiment=previous, status="PENDING").update(
             status="CANCELLED", reason="experiment_paused", finished_at=timezone.now()
         )
+        from quanthecy.agents.models import AgentRun
+
+        AgentRun.objects.filter(
+            paper_opportunity__experiment=previous, state__in=["PENDING", "RUNNING"]
+        ).update(
+            state="CANCELLED",
+            stage="cancelled",
+            error_code="paper_paused",
+            finished_at=timezone.now(),
+        )
+        previous.opportunities.filter(state="WAITING").update(
+            state="PAUSED", reason="experiment_paused"
+        )
     policy = dict(POLICY)
-    if version == EXPERIMENT_VERSION:
+    if version in {EXPERIMENT_VERSION, ASSISTANT_EXPERIMENT}:
         policy.update(
             version=version,
             agent_policy="automatic_entry_review",
@@ -150,6 +195,11 @@ def create_experiment(
             review_cooldown_minutes=15,
             max_review_price_drift="0.02",
             review_max_output_tokens=2048,
+        )
+    if version == ASSISTANT_EXPERIMENT:
+        policy.update(
+            agent_policy="langgraph_assistant_review",
+            assistant_version_ids=[str(v.id) for v in versions],
         )
     experiment = Experiment.objects.create(
         organization_id=organization_id,
@@ -167,11 +217,17 @@ def create_experiment(
         )
     now = timezone.now()
     for platform in sorted({m.platform for m in markets}):
-        for strategy in STRATEGIES:
+        bindings = (
+            [("momentum", None), ("buy_hold", None)] + [("assistant", v) for v in versions]
+            if version == ASSISTANT_EXPERIMENT
+            else [(s, None) for s in STRATEGIES]
+        )
+        for strategy, assistant_version in bindings:
             account = Account.objects.create(
                 experiment=experiment,
                 platform=platform,
                 strategy=strategy,
+                assistant_version=assistant_version,
                 initial_cash=initial_cash,
                 cash=initial_cash,
                 high_water=initial_cash,
@@ -196,6 +252,9 @@ def set_running(
     actor: User, organization_id: UUID, running: bool, experiment_id: UUID | None = None
 ) -> Experiment:
     require_org_role(actor, organization_id, {"OWNER", "ADMIN", "MEMBER"})
+    from quanthecy.organizations.models import Organization
+
+    Organization.objects.select_for_update().get(pk=organization_id)
     lock_plan()
     query = Experiment.objects.select_for_update().filter(organization_id=organization_id)
     experiment = (
@@ -207,13 +266,8 @@ def set_running(
         from django.http import Http404
 
         raise Http404
-    if (
-        running
-        and experiment.version == VERSION
-        and Experiment.objects.filter(
-            organization_id=organization_id, version=EXPERIMENT_VERSION
-        ).exists()
-    ):
+    latest = query.order_by("-created_at", "-version", "-id").first()
+    if running and latest is not None and experiment.id != latest.id:
         raise ValidationError("Historical experiments cannot resume after an upgrade.")
     if (
         running
@@ -281,6 +335,9 @@ def upgrade_experiment(
     actor: User, organization_id: UUID, daily_review_limit: int = 10
 ) -> Experiment:
     require_org_role(actor, organization_id, {"OWNER", "ADMIN", "MEMBER"})
+    from quanthecy.organizations.models import Organization
+
+    Organization.objects.select_for_update().get(pk=organization_id)
     lock_plan()
     previous = get_object_or_404(
         Experiment.objects.select_for_update(), organization_id=organization_id, version=VERSION

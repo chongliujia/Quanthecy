@@ -25,7 +25,7 @@ export default function PaperEquityChart({ accounts }: { accounts: PaperAccount[
       tooltip: { trigger: 'axis', renderMode: 'richText', valueFormatter: (value: unknown) => value == null ? '—' : Number(value).toFixed(2) },
       xAxis: { type: 'time', axisLabel: { color: colors.muted }, axisLine: { lineStyle: { color: colors.border } } },
       yAxis: { type: 'value', scale: true, axisLabel: { color: colors.muted }, splitLine: { lineStyle: { color: colors.grid } } },
-      series: [...accounts.map(a => ({ name: t(strategyNames[a.strategy]), type: 'line', showSymbol: a.equity_history.length < 3, connectNulls: false,
+      series: [...accounts.map(a => ({ name: a.label || t(strategyNames[a.strategy]), type: 'line', showSymbol: a.equity_history.length < 3, connectNulls: false,
         data: a.equity_history.map(p => [Date.parse(p.at), p.equity == null ? null : Number(p.equity)]) })),
       { name: t('Cash benchmark'), type: 'line', symbol: 'none', lineStyle: { type: 'dashed', color: colors.muted }, data: accounts[0]?.equity_history.map(p => [Date.parse(p.at), Number(accounts[0].initial_cash)]) ?? [] }],
     })

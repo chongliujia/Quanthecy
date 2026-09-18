@@ -20,7 +20,9 @@ class Experiment(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["organization", "version"], name="paper_version_unique"
+                fields=["organization", "version"],
+                condition=models.Q(version__in=["paper-v1", "paper-v2"]),
+                name="paper_legacy_version_unique",
             ),
             models.UniqueConstraint(
                 fields=["organization"],
@@ -46,6 +48,11 @@ class Account(models.Model):
     experiment = models.ForeignKey(Experiment, on_delete=models.PROTECT, related_name="accounts")
     platform = models.CharField(max_length=20)
     strategy = models.CharField(max_length=30)
+    assistant_version = models.ForeignKey(
+        "agents.AssistantVersion",
+        null=True,
+        on_delete=models.PROTECT,
+    )
     initial_cash = models.DecimalField(max_digits=20, decimal_places=6, default=10000)
     cash = models.DecimalField(max_digits=20, decimal_places=6, default=10000)
     realized_pnl = models.DecimalField(max_digits=20, decimal_places=6, default=0)
@@ -56,7 +63,21 @@ class Account(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["experiment", "platform", "strategy"], name="paper_account_unique"
+                fields=["experiment", "platform", "strategy"],
+                condition=models.Q(assistant_version__isnull=True),
+                name="paper_baseline_unique",
+            ),
+            models.UniqueConstraint(
+                fields=["experiment", "platform", "assistant_version"],
+                condition=models.Q(assistant_version__isnull=False),
+                name="paper_assistant_unique",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(strategy="assistant", assistant_version__isnull=False)
+                    | (~models.Q(strategy="assistant") & models.Q(assistant_version__isnull=True))
+                ),
+                name="paper_assistant_binding",
             ),
             models.CheckConstraint(condition=models.Q(cash__gte=0), name="paper_cash_nonnegative"),
         ]
@@ -91,6 +112,9 @@ class Opportunity(models.Model):
     experiment = models.ForeignKey(
         Experiment, on_delete=models.PROTECT, related_name="opportunities"
     )
+    account = models.ForeignKey(
+        Account, null=True, on_delete=models.PROTECT, related_name="opportunities"
+    )
     market = models.ForeignKey("markets.Market", on_delete=models.PROTECT)
     observation_id = models.UUIDField()
     detected_at = models.DateTimeField()
@@ -108,12 +132,24 @@ class Opportunity(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["experiment", "market", "observation_id"], name="paper_opportunity_unique"
+                fields=["experiment", "market", "observation_id"],
+                condition=models.Q(account__isnull=True),
+                name="paper_legacy_opportunity_unique",
             ),
             models.UniqueConstraint(
                 fields=["experiment", "market"],
-                condition=models.Q(state="WAITING"),
-                name="paper_one_waiting_opportunity",
+                condition=models.Q(state="WAITING", account__isnull=True),
+                name="paper_legacy_waiting_opportunity",
+            ),
+            models.UniqueConstraint(
+                fields=["account", "market", "observation_id"],
+                condition=models.Q(account__isnull=False),
+                name="paper_account_opportunity_unique",
+            ),
+            models.UniqueConstraint(
+                fields=["account", "market"],
+                condition=models.Q(state="WAITING", account__isnull=False),
+                name="paper_account_waiting_unique",
             ),
         ]
         indexes = [models.Index(fields=["experiment", "state", "detected_at"])]

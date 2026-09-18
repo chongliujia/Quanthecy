@@ -42,6 +42,7 @@ def create(request: HttpRequest, organization_id: UUID, payload: CreateInput) ->
         payload.name,
         version=payload.version,
         daily_review_limit=payload.daily_review_limit,
+        assistant_version_ids=payload.assistant_version_ids,
     )
     return views.lab(actor, organization_id)
 

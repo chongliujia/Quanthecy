@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from typing import Any
 from uuid import UUID, uuid4
 
 from django.core.exceptions import ValidationError
@@ -16,7 +17,7 @@ from quanthecy.research.services import cutoff_time
 
 from .catalog import DEFAULT_ENDPOINTS
 from .configuration import decrypt_key, endpoint, validate_local_limits, validate_model_target
-from .models import AgentRun, ModelConfiguration
+from .models import AgentRun, Assistant, ModelConfiguration
 from .schemas import AgentStatus
 
 RUN_ROLES = {"OWNER", "ADMIN", "MEMBER"}
@@ -79,7 +80,9 @@ def status(actor: User, organization_id: UUID) -> AgentStatus:
 def list_runs(actor: User, organization_id: UUID, market_id: UUID | None) -> list[AgentRun]:
     require_org_member(actor, organization_id)
     expire_runs()
-    query = AgentRun.objects.filter(organization_id=organization_id).exclude(kind="PAPER_REVIEW")
+    query = AgentRun.objects.filter(organization_id=organization_id).exclude(
+        kind__in=["PAPER_REVIEW", "ASSIST_TEST"]
+    )
     if market_id:
         query = query.filter(market_id=market_id)
     return list(query[:20])
@@ -101,6 +104,8 @@ def enqueue(
     cutoff: datetime | None = None,
     workflow: Workflow = "single",
     language: Language = "en",
+    assistant: Assistant | None = None,
+    assistant_graph: dict[str, Any] | None = None,
 ) -> AgentRun:
     if workflow not in {"single", "team"} or language not in {"zh", "en"}:
         raise ValidationError("Unknown research workflow or language.")
@@ -108,6 +113,13 @@ def enqueue(
         workflow, language = "single", "en"
     calls = len(SKILLS) if workflow == "team" else 1
     kind = "RESEARCH" if market_id else "TEST"
+    if assistant is not None:
+        from quanthecy_analytics.assistant import AssistantGraph, compile_graph
+
+        if assistant.organization_id != organization_id or market_id is None:
+            raise ValidationError("Invalid assistant context.")
+        calls = len(compile_graph(AssistantGraph.model_validate(assistant_graph)))
+        kind = "ASSIST_TEST"
     roles = RUN_ROLES if market_id else {"OWNER"}
     require_org_role(actor, organization_id, roles)
     Organization.objects.select_for_update().get(pk=organization_id)
@@ -119,8 +131,10 @@ def enqueue(
         if (
             existing.market_id != market_id
             or existing.kind != kind
-            or existing.workflow != workflow
+            or existing.workflow != ("assistant" if assistant else workflow)
             or existing.language != language
+            or existing.assistant_id != (assistant.id if assistant else None)
+            or existing.assistant_graph != assistant_graph
             or (cutoff and existing.cutoff != cutoff)
         ):
             raise ValidationError("This request key was already used for another analysis.")
@@ -144,6 +158,9 @@ def enqueue(
     at = cutoff_time(cutoff)
     if market_id:
         get_object_or_404(Market, pk=market_id, first_observed_at__lte=at)
+    from quanthecy_analytics.assistant import VERSION as ASSISTANT_VERSION
+    from quanthecy_analytics.intelligence import digest
+
     return AgentRun.objects.create(
         organization_id=organization_id,
         requested_by=actor,
@@ -154,10 +171,16 @@ def enqueue(
         configuration_revision=config.revision,
         provider=config.provider,
         model=config.model,
-        workflow=workflow,
+        workflow="assistant" if assistant else workflow,
         language=language,
         reserved_calls=calls,
-        prompt_version=VERSION if workflow == "team" else "research-v1",
+        prompt_version=ASSISTANT_VERSION
+        if assistant
+        else (VERSION if workflow == "team" else "research-v1"),
+        assistant=assistant,
+        assistant_name=assistant.name if assistant else "",
+        assistant_graph=assistant_graph,
+        assistant_graph_hash=digest(assistant_graph) if assistant else "",
     )
 
 

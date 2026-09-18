@@ -8,7 +8,8 @@ from pydantic import Field
 
 
 class CreateInput(Schema):
-    version: Literal["paper-v1", "paper-v2"] = "paper-v2"
+    version: Literal["paper-v1", "paper-v2", "paper-v3"] = "paper-v2"
+    assistant_version_ids: list[UUID] = Field(default_factory=list, max_length=3)
     daily_review_limit: int = Field(default=10, ge=1, le=20)
     name: str = Field(default="Paper trading experiment", min_length=1, max_length=120)
     market_ids: list[UUID] = Field(min_length=1, max_length=20)
@@ -40,6 +41,9 @@ class AccountOut(Schema):
     id: UUID
     platform: str
     strategy: str
+    label: str = ""
+    assistant_version_id: UUID | None = None
+    review_summary: "ReviewSummary | None" = None
     initial_cash: Decimal
     cash: Decimal
     reserved_cash: Decimal
@@ -141,6 +145,9 @@ class ReviewOut(Schema):
     error_code: str
     baseline_filled: bool
     agent_filled: bool
+    account_id: UUID | None = None
+    assistant_label: str = ""
+    run_id: UUID | None = None
 
 
 class ReviewDetail(ReviewOut):
@@ -166,6 +173,7 @@ class LabOut(Schema):
     error_code: str
     collector: dict[str, Any]
     market_count: int
+    market_ids: list[UUID] = Field(default_factory=list)
     accounts: list[AccountOut]
     positions: list[PositionOut]
     recent_orders: list[OrderOut]

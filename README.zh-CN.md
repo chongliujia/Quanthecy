@@ -248,6 +248,7 @@ Django 是统一的公共应用后端，通过 ORM 迁移管理 PostgreSQL 模�
 | [专家研究团队](docs/intelligence-team.md) | 角色、上下文范围、报告与校验 |
 | [自选与提醒](docs/watchlists-alerts.md) | 工作区自选、规则窗口、触发依据和服务恢复 |
 | [模拟交易实验室](docs/paper-trading-v2.md) | 虚拟账户、自动入场评审、版本化对照与成交复算 |
+| [可编排助手](docs/assistant-builder.md) | LangGraph 拖拽团队、版本发布、单次试运行与多助手模拟对照 |
 | [数据质量](docs/data-quality.md) | 准入规则和指标限制 |
 | [市场发现](docs/market-directory.md) | 分页目录、批量纳入、分层采集及结算复查 |
 | [采集控制](docs/collection-controls.md) | 后台开关、各来源频率、生效确认与恢复 |

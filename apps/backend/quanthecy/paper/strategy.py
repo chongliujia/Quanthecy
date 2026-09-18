@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from decimal import ROUND_DOWN, Decimal
 
 from django.db.models import Sum
+from quanthecy_analytics.assistant import EXPERIMENT_VERSION as ASSISTANT_EXPERIMENT
 from quanthecy_analytics.paper import ZERO, ExecutionQuote, money, quote_issue
 from quanthecy_analytics.paper_review import EXPERIMENT_VERSION
 from quanthecy_analytics.quality import VERSION as QUALITY_VERSION
@@ -16,12 +17,9 @@ def decide(
     account: Account, target: ExperimentMarket, quote: ExecutionQuote | None, now: datetime
 ) -> None:
     market = target.market
-    automatic = account.experiment.version == EXPERIMENT_VERSION
-    opportunity = (
-        reviews.resumable(account, market.id)
-        if automatic and account.strategy == "agent_filtered"
-        else None
-    )
+    automatic = account.experiment.version in {EXPERIMENT_VERSION, ASSISTANT_EXPERIMENT}
+    agent_account = account.strategy in {"agent_filtered", "assistant"}
+    opportunity = reviews.resumable(account, market.id) if automatic and agent_account else None
     phase = "REVIEW" if opportunity else "SIGNAL"
     observation_id = market.latest.get("observation_id")
     if (
@@ -157,13 +155,21 @@ def decide(
         automatic
         and action == "BUY"
         and quote
-        and account.strategy in {"momentum", "agent_filtered"}
+        and (
+            agent_account
+            or (account.strategy == "momentum" and account.experiment.version == EXPERIMENT_VERSION)
+        )
     ):
         opportunity = opportunity or reviews.opportunity_for(account, target, quote, now)
-        if account.strategy == "agent_filtered":
+        if agent_account:
             action, reason, agent_run = reviews.gate(opportunity, target, quote, now)
+            if opportunity and action == "BUY" and reviews.current_signal_issue(opportunity, now):
+                action, reason = "WAIT", reviews.current_signal_issue(opportunity, now)
     inputs = {
         "version": account.experiment.version,
+        "assistant_version_id": str(account.assistant_version_id)
+        if account.assistant_version_id
+        else None,
         "opportunity_id": str(opportunity.id) if opportunity else None,
         "policy": account.experiment.settings,
         "observation": market.latest,
@@ -186,7 +192,7 @@ def decide(
         phase=phase,
         opportunity=opportunity,
     )
-    if opportunity and account.strategy == "agent_filtered" and phase == "REVIEW":
+    if opportunity and agent_account and phase == "REVIEW":
         opportunity.agent_decision = decision
         opportunity.state = {
             "review_allowed": "ALLOWED",

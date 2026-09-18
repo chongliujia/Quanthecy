@@ -69,7 +69,9 @@ def lab(actor: User, organization_id: UUID, experiment_id: UUID | None = None) -
         pass
     accounts = []
     positions: list[PositionOut] = []
-    for account in experiment.accounts.order_by("platform", "strategy"):
+    for account in experiment.accounts.select_related("assistant_version").order_by(
+        "platform", "strategy", "id"
+    ):
         latest = account.equity.order_by("-at").first()
         reserve = (
             account.orders.filter(status="PENDING", side="BUY").aggregate(value=Sum("budget"))[
@@ -83,6 +85,13 @@ def lab(actor: User, organization_id: UUID, experiment_id: UUID | None = None) -
                 id=account.id,
                 platform=account.platform,
                 strategy=account.strategy,
+                label=f"{account.assistant_version.name} · v{account.assistant_version.number}"
+                if account.assistant_version is not None
+                else "",
+                assistant_version_id=account.assistant_version_id,
+                review_summary=evaluation(actor, experiment, account)
+                if account.assistant_version is not None
+                else None,
                 initial_cash=account.initial_cash,
                 cash=account.cash,
                 reserved_cash=reserve,
@@ -133,7 +142,9 @@ def lab(actor: User, organization_id: UUID, experiment_id: UUID | None = None) -
             for e in experiments
         ],
         is_latest=experiment.id == experiments[0].id,
-        review_summary=evaluation(actor, experiment) if experiment.version == "paper-v2" else None,
+        review_summary=evaluation(actor, experiment)
+        if experiment.version in {"paper-v2", "paper-v3"}
+        else None,
         recent_reviews=[
             review_summary(o)
             for o in with_entry_counts(
@@ -150,6 +161,7 @@ def lab(actor: User, organization_id: UUID, experiment_id: UUID | None = None) -
         error_code=experiment.error_code,
         collector=collector,
         market_count=experiment.universe.count(),
+        market_ids=list(experiment.universe.values_list("market_id", flat=True)),
         accounts=accounts,
         positions=positions,
         recent_orders=[OrderOut(**order_summary(o)) for o in orders],

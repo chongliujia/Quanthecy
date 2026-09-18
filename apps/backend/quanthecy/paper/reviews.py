@@ -9,6 +9,16 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import transaction
 from django.http import Http404
 from django.utils import timezone
+from quanthecy_analytics.assistant import (
+    EXPERIMENT_VERSION as ASSISTANT_EXPERIMENT,
+)
+from quanthecy_analytics.assistant import (
+    VERSION as ASSISTANT_VERSION,
+)
+from quanthecy_analytics.assistant import (
+    AssistantGraph,
+    compile_graph,
+)
 from quanthecy_analytics.intelligence import digest
 from quanthecy_analytics.paper import ExecutionQuote, quote_issue
 from quanthecy_analytics.paper_review import EXPERIMENT_VERSION, VERSION, EntryReview
@@ -33,6 +43,7 @@ def resumable(account: Account, market_id: UUID) -> Opportunity | None:
     return (
         Opportunity.objects.filter(
             experiment=account.experiment,
+            account=account if account.assistant_version_id else None,
             market_id=market_id,
             state="WAITING",
             agent_decision__isnull=True,
@@ -49,6 +60,7 @@ def opportunity_for(
 ) -> Opportunity | None:
     last = (
         Opportunity.objects.filter(experiment=account.experiment, market=target.market)
+        .filter(account=account if account.assistant_version_id else None)
         .select_related("review_run")
         .order_by("-detected_at")
         .first()
@@ -61,7 +73,11 @@ def opportunity_for(
     if last and now - last.detected_at < timedelta(minutes=15):
         return None
     # A baseline entry while the Agent account is already invested is not a new review candidate.
-    agent = account.experiment.accounts.get(platform=account.platform, strategy="agent_filtered")
+    agent = (
+        account
+        if account.assistant_version_id
+        else account.experiment.accounts.get(platform=account.platform, strategy="agent_filtered")
+    )
     if (
         agent.positions.filter(market=target.market, quantity__gt=0).exists()
         or agent.orders.filter(market=target.market, status="PENDING").exists()
@@ -69,6 +85,7 @@ def opportunity_for(
         return None
     return Opportunity.objects.create(
         experiment=account.experiment,
+        account=account if account.assistant_version_id else None,
         market=target.market,
         observation_id=target.market.latest["observation_id"],
         detected_at=now,
@@ -121,6 +138,13 @@ def current_signal_issue(op: Opportunity, now: datetime) -> str:
         or market.probability_change_15m < 0.02
     ):
         return "review_signal_changed"
+    if op.account is not None and op.account.assistant_version is not None:
+        threshold = op.account.assistant_version.graph["entry_change_15m"]
+        if (
+            market.probability_change_15m < threshold
+            or op.inputs["probability_change_15m"] < threshold
+        ):
+            return "assistant_signal_filter"
     closes = market.latest["market"].get("closes_at")
     if closes and datetime.fromisoformat(closes.replace("Z", "+00:00")) < now + timedelta(hours=1):
         return "near_market_close"
@@ -142,12 +166,19 @@ def gate(
         return "WAIT", "review_failed", run
     if (
         run.kind != "PAPER_REVIEW"
-        or run.prompt_version != VERSION
+        or run.prompt_version != (ASSISTANT_VERSION if op.account_id else VERSION)
         or run.organization_id != op.experiment.organization_id
         or run.market_id != op.market_id
         or run.cutoff != op.detected_at
         or not run.finished_at
         or run.finished_at > now
+    ):
+        return "WAIT", "review_invalid", run
+    version = op.account.assistant_version if op.account is not None else None
+    if version is not None and (
+        run.assistant_version_id != version.id
+        or run.assistant_graph_hash != version.graph_hash
+        or run.workflow != "assistant"
     ):
         return "WAIT", "review_invalid", run
     config = ModelConfiguration.objects.filter(organization_id=run.organization_id).first()
@@ -178,6 +209,8 @@ def schedule_one(opportunity_id: UUID) -> bool:
         op.save(update_fields=["state", "reason"])
         return False
     config = ModelConfiguration.objects.filter(organization_id=experiment.organization_id).first()
+    version = op.account.assistant_version if op.account is not None else None
+    calls = len(compile_graph(AssistantGraph.model_validate(version.graph))) if version else 1
     reason = ""
     try:
         require_org_role(experiment.created_by, experiment.organization_id, RUN_ROLES)
@@ -202,7 +235,7 @@ def schedule_one(opportunity_id: UUID) -> bool:
         ).count()
         if (
             paper_calls >= experiment.settings["daily_review_limit"]
-            or runs_today(experiment.organization_id) >= config.daily_run_limit
+            or runs_today(experiment.organization_id) + calls > config.daily_run_limit
         ):
             reason = "review_daily_limit"
         elif AgentRun.objects.filter(
@@ -225,8 +258,15 @@ def schedule_one(opportunity_id: UUID) -> bool:
         configuration_revision=config.revision,
         provider=config.provider,
         model=config.model,
-        prompt_version=VERSION,
+        prompt_version=ASSISTANT_VERSION if version else VERSION,
         language="zh",
+        workflow="assistant" if version else "single",
+        reserved_calls=calls,
+        assistant=version.assistant if version else None,
+        assistant_name=f"{version.name} · v{version.number}" if version else "",
+        assistant_version=version,
+        assistant_graph=version.graph if version else None,
+        assistant_graph_hash=version.graph_hash if version else "",
     )
     op.reason = "review_pending"
     op.save(update_fields=["review_run", "reason"])
@@ -243,7 +283,7 @@ def schedule_reviews() -> None:
     ids = list(
         Opportunity.objects.filter(
             experiment__running=True,
-            experiment__version=EXPERIMENT_VERSION,
+            experiment__version__in=[EXPERIMENT_VERSION, ASSISTANT_EXPERIMENT],
             state="WAITING",
             review_run__isnull=True,
             expires_at__gt=now,
@@ -263,10 +303,10 @@ def require_live_review(run: AgentRun) -> Opportunity:
     )
     if (
         not op.experiment.running
-        or op.experiment.version != EXPERIMENT_VERSION
+        or op.experiment.version not in {EXPERIMENT_VERSION, ASSISTANT_EXPERIMENT}
         or op.state != "WAITING"
         or op.expires_at <= timezone.now()
-        or run.prompt_version != VERSION
+        or run.prompt_version != (ASSISTANT_VERSION if op.account_id else VERSION)
         or run.cutoff != op.detected_at
         or current_signal_issue(op, timezone.now())
     ):

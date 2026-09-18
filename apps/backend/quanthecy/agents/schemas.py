@@ -97,7 +97,8 @@ class StageOut(Schema):
     state: str
     started_at: datetime
     finished_at: datetime | None
-    output: RiskReviewOutput | SpecialistOutput | IntelligenceReport | None
+    output: RiskReviewOutput | SpecialistOutput | IntelligenceReport | EntryReview | None
+    input_packet: dict[str, Any] | None = None
     usage: dict[str, int]
     error_code: str
     validation_errors: list[ValidationIssue] = Field(default_factory=list)
@@ -118,6 +119,10 @@ class RunOut(Schema):
     workflow: str
     language: str
     reserved_calls: int
+    assistant_id: UUID | None = None
+    assistant_version_id: UUID | None = None
+    assistant_graph_hash: str = ""
+    assistant_name: str = ""
     steps: list[StageOut]
     report: IntelligenceReport | ResearchReport | EntryReview | None
     usage: dict[str, Any]
@@ -129,3 +134,4 @@ class RunOut(Schema):
 
 class RunDetail(RunOut):
     context: dict[str, Any]
+    assistant_graph: dict[str, Any] | None = None

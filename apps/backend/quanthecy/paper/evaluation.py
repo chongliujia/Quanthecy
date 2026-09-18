@@ -1,6 +1,20 @@
 from uuid import UUID
 
-from django.db.models import Avg, Count, Exists, F, IntegerField, OuterRef, Q, QuerySet, Sum, Value
+from django.db.models import (
+    Avg,
+    BooleanField,
+    Case,
+    Count,
+    Exists,
+    F,
+    IntegerField,
+    OuterRef,
+    Q,
+    QuerySet,
+    Sum,
+    Value,
+    When,
+)
 from django.db.models.functions import Cast, Coalesce
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -10,7 +24,7 @@ from quanthecy.agents.models import AgentRun
 from quanthecy.agents.services import runs_today, status
 from quanthecy.organizations.policies import require_org_member
 
-from .models import Experiment, Opportunity, Order
+from .models import Account, Experiment, Opportunity, Order
 from .schemas import ReviewDetail, ReviewOut, ReviewSummary
 
 
@@ -18,22 +32,59 @@ def with_entry_counts(query: QuerySet[Opportunity]) -> QuerySet[Opportunity]:
     orders = Order.objects.filter(
         decision__opportunity_id=OuterRef("pk"), side="BUY", filled_quantity__gt=0
     )
+    baseline = Order.objects.filter(
+        account__experiment_id=OuterRef("experiment_id"),
+        account__strategy="momentum",
+        market_id=OuterRef("market_id"),
+        decision__observation_id=OuterRef("observation_id"),
+        side="BUY",
+        filled_quantity__gt=0,
+    )
     return query.annotate(
-        baseline_filled_flag=Exists(orders.filter(account__strategy="momentum")),
-        agent_filled_flag=Exists(orders.filter(account__strategy="agent_filtered")),
+        baseline_filled_flag=Case(
+            When(account__isnull=True, then=Exists(orders.filter(account__strategy="momentum"))),
+            default=Exists(baseline),
+            output_field=BooleanField(),
+        ),
+        agent_filled_flag=Exists(
+            orders.filter(account__strategy__in=["agent_filtered", "assistant"])
+        ),
     )
 
 
 def filled(op: Opportunity, strategy: str) -> bool:
+    if strategy == "momentum":
+        if op.account_id is None:
+            return Order.objects.filter(
+                decision__opportunity=op,
+                account__strategy="momentum",
+                side="BUY",
+                filled_quantity__gt=0,
+            ).exists()
+        return Order.objects.filter(
+            account__experiment=op.experiment,
+            account__strategy="momentum",
+            market_id=op.market_id,
+            decision__observation_id=op.observation_id,
+            side="BUY",
+            filled_quantity__gt=0,
+        ).exists()
     return Order.objects.filter(
-        decision__opportunity=op, account__strategy=strategy, side="BUY", filled_quantity__gt=0
+        decision__opportunity=op,
+        account__strategy__in=["agent_filtered", "assistant"],
+        side="BUY",
+        filled_quantity__gt=0,
     ).exists()
 
 
 def review_summary(op: Opportunity) -> ReviewOut:
     run = op.review_run
+    version = op.account.assistant_version if op.account is not None else None
     return ReviewOut(
         id=op.id,
+        account_id=op.account_id,
+        assistant_label=(f"{version.name} · v{version.number}") if version is not None else "",
+        run_id=run.id if run else None,
         market_id=op.market_id,
         title=op.market.title,
         detected_at=op.detected_at,
@@ -53,11 +104,16 @@ def review_summary(op: Opportunity) -> ReviewOut:
     )
 
 
-def evaluation(actor: User, experiment: Experiment) -> ReviewSummary:
+def evaluation(
+    actor: User, experiment: Experiment, account: Account | None = None
+) -> ReviewSummary:
     # The capability is workspace configuration; VIEWER status does not make it unavailable.
     model = status(actor, experiment.organization_id)
-    ops = experiment.opportunities
+    ops = experiment.opportunities.all()
     runs = AgentRun.objects.filter(paper_opportunity__experiment=experiment)
+    if account:
+        ops = ops.filter(account=account)
+        runs = runs.filter(paper_opportunity__account=account)
     counts = ops.aggregate(
         candidates=Count("id"),
         invalidated=Count("id", filter=Q(state__in=["INVALIDATED", "EXPIRED", "PAUSED"])),

@@ -150,6 +150,11 @@ def process_one(
             )
         if not live_run(run).update(context=context, stage="analyzing") or stopped.is_set():
             return True
+        if run.workflow == "assistant":
+            from .assistant_runtime import execute
+
+            execute(run, context, stopped, complete)
+            return True
         if run.workflow == "team":
             if run.prompt_version != VERSION or run.reserved_calls != len(SKILLS):
                 raise ProviderFailure("configuration_changed")

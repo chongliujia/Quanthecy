@@ -142,6 +142,23 @@ def test_queue_is_idempotent_and_general_caution_does_not_block_entry(upgraded):
     assert summary.model_cost_usd is None
 
 
+def test_legacy_participation_keeps_pairing_by_saved_opportunity(upgraded):
+    from quanthecy.paper.evaluation import filled, with_entry_counts
+
+    _, _, market, _, experiment = upgraded
+    cycle(experiment, market, BASE)
+    op = Opportunity.objects.get()
+    baseline = Account.objects.get(experiment=experiment, strategy="momentum")
+    decision = baseline.orders.get().decision
+    # v2 may reuse a live opportunity for a later baseline observation. Its
+    # historical participation must keep the original opportunity-based rule.
+    decision.observation_id = uuid4()
+    decision.save(update_fields=["observation_id"])
+    cycle(experiment, market, BASE + timedelta(seconds=3))
+    assert filled(op, "momentum")
+    assert with_entry_counts(Opportunity.objects.all()).get().baseline_filled_flag
+
+
 @pytest.mark.parametrize("result, expected", [("REJECT", "REJECTED"), ("WAIT", "ABSTAINED")])
 def test_review_rejection_and_abstention_are_distinct(upgraded, result, expected):
     _, org, market, _, new = upgraded

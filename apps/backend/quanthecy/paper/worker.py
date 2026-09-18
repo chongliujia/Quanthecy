@@ -4,6 +4,7 @@ from uuid import UUID
 
 from django.db import transaction
 from django.utils import timezone
+from quanthecy_analytics.assistant import EXPERIMENT_VERSION as ASSISTANT_EXPERIMENT
 from quanthecy_analytics.paper import VERSION, ExecutionQuote
 from quanthecy_analytics.paper_review import EXPERIMENT_VERSION
 
@@ -26,7 +27,7 @@ def process_experiment(
     )
     if experiment is None:
         return
-    if experiment.version not in {VERSION, EXPERIMENT_VERSION}:
+    if experiment.version not in {VERSION, EXPERIMENT_VERSION, ASSISTANT_EXPERIMENT}:
         raise ValueError("Unsupported paper policy version")
     targets = list(experiment.universe.select_related("market", "market__event"))
     # Prevent a mismapped public quote from affecting any account.
@@ -39,7 +40,7 @@ def process_experiment(
         ):
             raise ValueError("Execution quote identity mismatch")
     for account in experiment.accounts.select_related(
-        "experiment", "experiment__organization"
+        "experiment", "experiment__organization", "assistant_version"
     ).order_by("id"):
         settle(account, quotes, now)
         if experiment.running:

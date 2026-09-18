@@ -1,5 +1,6 @@
 export type PaperAccount = {
   id: string; platform: string; strategy: string; initial_cash: string; cash: string; reserved_cash: string
+  label?: string; assistant_version_id?: string | null; review_summary?: PaperReviewSummary | null
   equity: string | null; realized_pnl: string; unrealized_pnl: string | null; fees: string; max_drawdown: string
   unpriced_positions: number; equity_at: string | null; fills: number; orders: number
   equity_history: { at: string; equity: string | null }[]
@@ -13,7 +14,7 @@ export type PaperLabData = {
   is_latest?: boolean; review_summary?: PaperReviewSummary | null; recent_reviews?: PaperReview[]
   id: string; name: string; running: boolean; version: string; settings: Record<string, unknown>; checked_at: string | null
   created_at: string; error_code: string; collector: { checked_at?: string; errors?: number; successful?: number; markets?: number }
-  market_count: number; accounts: PaperAccount[]
+  market_ids?: string[]; market_count: number; accounts: PaperAccount[]
   positions: { id: string; account_id: string; market_id: string; title: string; quantity: string; cost_basis: string; opened_at: string }[]
   recent_orders: PaperOrder[]
   recent_decisions: { id: string; account_id: string; market_id: string; title: string; action: string; reason: string; created_at: string }[]
@@ -26,6 +27,7 @@ export type PaperOrderDetail = PaperOrder & {
 export type PaperCandidate = { id: string; platform: string; title: string; event: string; bid: number; ask: number }
 export const strategyNames: Record<string, string> = { momentum: 'Momentum baseline', agent_filtered: 'Momentum + Agent filter', buy_hold: 'Buy and hold benchmark' }
 export const paperReasons: Record<string, string> = {
+  assistant_signal_filter: 'Below this assistant’s signal threshold',
   awaiting_orderbook: 'Awaiting order book', stale_orderbook: 'Order book is stale', stale_metadata: 'Market metadata is stale',
   market_not_open: 'Market is not open', missing_two_sided_quote: 'Two-sided quotes unavailable', unknown_fees: 'Fee parameters unavailable',
   spread_above_limit: 'Spread exceeds the experiment limit', rules_changed: 'Contract rules changed', stale_market_observation: 'Market observation is stale',
@@ -46,6 +48,7 @@ export const paperReasons: Record<string, string> = {
 }
 
 export type PaperReview = {
+  account_id?: string | null; assistant_label?: string; run_id?: string | null
   id: string; market_id: string; title: string; detected_at: string; expires_at: string
   state: string; reason: string; run_state: string | null; review_decision: string | null
   model: string | null; error_code: string; baseline_filled: boolean; agent_filled: boolean

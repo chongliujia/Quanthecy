@@ -2,17 +2,88 @@
 
 **English** · [简体中文](README.zh-CN.md)
 
-**An open-source research terminal for prediction markets, with traceable evidence and AI analysis.**
+**Prediction-market research, multi-agent workflows, and a paper trading lab.**
 
-Research **Polymarket** and **Kalshi** in one workspace. Follow market movements, check contract rules, inspect official evidence, and trace AI conclusions to the data available at the time.
+Research **Polymarket** and **Kalshi** in one workspace. Start with market data and traceable evidence, configure a research team, publish its workflow, and compare how virtual accounts analyze, abstain, and participate in simulated trading.
 
-[Quick start](#quick-start) · [Screenshots](#feature-tour) · [Documentation](#documentation) · [Roadmap](#current-scope-and-next-steps) · [Report a bug](https://github.com/chongliujia/Quanthecy/issues/new?template=bug_report.yml) · [Contribute](#contributing)
+[Quick start](#quick-start) · [Feature tour](#feature-tour) · [Architecture](#architecture) · [Documentation](#documentation) · [Contribute](#contributing)
 
-[Apache-2.0](LICENSE) · Self-hosted · English / 中文 · Light / dark themes
+[Apache-2.0](LICENSE) · Self-hosted · English / 中文 · Dark / light / system themes
 
-![Quanthecy desktop market research terminal in English](docs/images/en/market-terminal.png)
+![Quanthecy multi-agent workflow: three analysts feed a risk reviewer, followed by an entry reviewer](docs/images/2026-09-20/en/assistant-workflow.png)
 
-**Research MVP under active development.** These screenshots show a local installation with collected data. Coverage is selected, history begins at collection, and forecasts are not yet calibrated. Quanthecy does not execute trades or manage wallets.
+*Current interface, demonstration workspace. Captured on 2026-09-20 with isolated demo data; this is not a completed model run or evidence of strategy performance.*
+
+**Research platform under active development.** Paper experiments use virtual capital; Quanthecy does not connect wallets or send real trading orders. Coverage is selected and history begins at collection. Forecast accuracy and strategy profitability have not been established.
+
+## Feature tour
+
+### Configure a research team you can inspect
+
+Build workflows with quantitative, event intelligence, contract analysis, risk review, and entry review roles. Edit each node’s Prompt and Markdown Skills, connect its dependencies, validate the graph, and save a draft, run a trial, or publish an immutable version.
+
+- **Understand responsibilities:** the configuration overview lists roles, direct upstream nodes, output requirements, and research checklists you can append to prompts.
+- **Understand budgets:** inspect calls per run, remaining workspace allowance, and node output limits. Nodes can have individual token caps; they currently share the workspace model.
+- **Inspect the evidence:** each node receives frozen market context and only its explicitly connected upstream conclusions. Runs retain inputs, validated outputs, model configuration, and usage.
+- **Edit comfortably:** drag, zoom, expand, auto-arrange, undo, and redo. Nodes can move left of the origin to use the available canvas space.
+
+<details>
+<summary>Team configuration and risk controls</summary>
+
+![Team configuration: role responsibilities, dependencies, node budgets, and server risk policy](docs/images/2026-09-20/en/team-configuration.png)
+
+Analysis branches have independent inputs; model requests currently run sequentially through the workspace queue. The entry threshold is adjustable within bounds. Capital limits, quote freshness, and other fixed rules are enforced by the server and cannot be relaxed by a prompt. Existing experiments retain their frozen rules.
+
+See the [assistant builder](docs/assistant-builder.md) and [model, role, and risk configuration](docs/agent-configuration.md).
+
+</details>
+
+### Compare assistants and baselines in one experiment
+
+The paper lab creates independent virtual accounts for each platform and strategy. A new comparison can include the default assistant, up to three selected published versions, momentum and buy-and-hold accounts, plus a cash benchmark.
+
+![Paper trading lab: separate accounts, fees, drawdown, and equity comparison](docs/images/2026-09-20/en/paper-lab.png)
+
+*Demo accounts start with 10,000 virtual capital each and have no fills, so their curves overlap. This capture illustrates the interface, not strategy performance.*
+
+Inspect equity, fees, drawdown, fills, review participation, queue delay, and model usage together. Dedicated entry reviews return `ALLOW / REJECT / WAIT`; an allowed entry still faces fresh signal, price, contract, capital, and order-book checks. Pausing retains positions and history while valuation and verified settlement continue.
+
+Simulated fills use later order-book snapshots with fee, depth, and slippage constraints. Shared queues, rejection, expiry, and different samples affect comparisons. Model costs remain unknown without billing data. See [execution rules](docs/paper-trading-v2.md) and [multi-assistant experiments](docs/assistant-builder.md#模拟交易与评估).
+
+### Keep cloud and local model connections ready
+
+Save connection profiles and restore their model IDs, output limits, and related options. Profiles are isolated by workspace, protocol, and full API base URL. Switching back can reuse that connection’s saved credential.
+
+<details>
+<summary>Saved model connections</summary>
+
+![Model settings: saved connections, model parameters, and workspace call allowance](docs/images/2026-09-20/en/model-connections.png)
+
+Credentials are encrypted on the server; the frontend receives only their saved status. A new endpoint never inherits another connection’s key. Browsing, saving settings, and publishing assistants make no model calls. Explicit tests, trials, and automatic reviews in an enabled experiment can incur provider charges.
+
+This is a demonstration configuration; no provider request was executed. See the [model setup guide](docs/research-terminal.md#one-time-server-setup) for deployment and local endpoint requirements.
+
+</details>
+
+### Trace market observations through to a research conclusion
+
+| Capability | What you can inspect |
+| --- | --- |
+| Market terminal | Probability history, bid/ask, spreads, sampled volume, contract rules, CSV / Parquet exports |
+| Data quality and signals | Separate price/volume eligibility, calculation versions, thresholds, and source observations |
+| News and event evidence | Document versions, publication and first-observed times, source paragraphs, relevance reviews |
+| Cross-platform comparisons | Reviewed outcome alignment and settlement differences, before interpreting a price gap |
+| Watchlists and alerts | Shared workspace lists, midpoint-change and spread-widening alerts with retained trigger inputs |
+| Research reports | Single-Agent or specialist conclusions, citations, limitations, and validation diagnostics |
+
+<details>
+<summary>Market terminal and earlier captures with collected data</summary>
+
+![Market research terminal: probability, spread, volume, and market selection](docs/images/en/market-terminal.png)
+
+This 2026-09-17 capture uses collected market data and predates the current interface. Original bilingual overview, signal, event, news, and administration captures remain in the [screenshot index](docs/images/README.md), with provenance separate from the new demo set.
+
+</details>
 
 ## Quick start
 
@@ -21,7 +92,7 @@ Requires **Docker Engine and Docker Compose 2.24.4+**. The container workflow do
 Clone or download this repository, then run from its root:
 
 ```bash
-cp .env.example .env
+cp -n .env.example .env
 docker compose up --build -d --wait
 ```
 
@@ -36,8 +107,11 @@ The `migrate` service applies Django and ClickHouse migrations before dependent 
 
 1. Register in the web app. Registration creates a personal workspace and its OWNER membership. **There is no default account or password.**
 2. Open **Market explorer**. By default, the collector samples up to 10 markets per exchange every 60 seconds. Price/volume analytics need at least 15 minutes of sufficiently continuous, eligible observations.
-3. Explore **News & evidence**. An independent worker polls six enabled official and media feeds every 15 minutes by default; two BLS feeds start paused after an HTTP 403 connectivity check. See [news sources](docs/news-sources.md) for coverage and controls. Example topics and event dossiers require operator initialization; they are not automatically populated on every fresh install.
-4. For Agent research, follow the [model setup guide](docs/research-terminal.md) to configure credential encryption and a provider, then enable it in **Model settings** as a workspace owner. Models start disabled; explicitly initiated connection tests and research can incur provider charges.
+3. For model analysis, follow [server model setup](docs/research-terminal.md#one-time-server-setup) to configure a stable `AGENT_ENCRYPTION_KEY` and allowed provider endpoints. A workspace owner can then save and enable a connection in **Model settings**. Local `make setup-local` initializes a missing encryption key and requires host Python 3; the same guide includes a Docker-only option. Models start disabled.
+4. Open **Paper trading lab → My assistants**, copy the default template, edit roles and dependencies, inspect the configuration, run a trial, and publish a version. Trials call the model but create no simulated orders.
+5. In **Experiment comparison**, select published versions and markets to start a virtual-capital experiment. Eligible opportunities then automatically queue model reviews and consume workspace allowance.
+
+A fresh installation needs time to collect data. See [news sources](docs/news-sources.md) and [collection coverage](docs/collection-coverage.md) for feed, topic, and example-dossier setup. README demo accounts are not imported into new installations.
 
 <details>
 <summary>Operator setup, collection coverage, ports, and development</summary>
@@ -57,103 +131,6 @@ For hot reload, run `make dev` (its local setup helper requires host Python 3). 
 ```bash
 docker compose down
 ```
-
-</details>
-
-## What makes the research useful
-
-- **Data quality before interpretation.** Price and volume indicators have separate eligibility checks. Missing history, stale quotes, incompatible rules, and unreliable measurement bases remain visible.
-- **Contract-aware comparisons.** Related questions can settle differently. Cross-platform research uses reviewed outcome and settlement alignment rather than treating every price difference as arbitrage.
-- **Evidence you can inspect.** Event dossiers connect a versioned research question to contracts, official documents, original paragraphs, and append-only relevance reviews.
-- **Traceable Agent work.** Models interpret deterministic metrics within frozen context. Reports retain citations, expert stages, model/configuration versions, usage, limitations, and validation diagnostics.
-
-## Watch the markets that matter
-
-Use **Watchlists & alerts** to build shared workspace lists, filter the scanner, and set midpoint-change or spread-widening conditions. In-app alerts retain their quote inputs and rule versions, suppress stale data, and avoid repeating a sustained condition. They do not launch model requests. See [the workflow and limits](docs/watchlists-alerts.md).
-
-## Feature tour
-
-Expand a workflow to see its desktop screenshot and details. This page uses English images; the [Chinese README](README.zh-CN.md) uses Chinese images. All 16 original captures and their dates are in the [screenshot index](docs/images/README.md).
-
-<details>
-<summary>Research overview</summary>
-
-Start with collection status, research coverage, reviewed-comparison counts, and official feed entries. The overview connects the macroeconomics and interest-rate research topic to market exploration, contract comparison, and evidence inspection.
-
-![English desktop research overview with collection status and coverage cards](docs/images/en/research-overview.png)
-
-</details>
-
-<details>
-<summary>Market research terminal</summary>
-
-The terminal shown at the top of this page combines YES probability history, bid/ask quotes, spread and sampled-volume charts, and a market-switching panel. Inspect signals and news on the same timeline, change the historical window, review contract rules, and export collected history as CSV or Parquet. The UI supports English/Chinese and light/dark/system themes.
-
-The screenshot also shows a partial data-quality warning and an unavailable volume Z-score. An available price series does not make every other indicator valid.
-
-</details>
-
-<details>
-<summary>Research inspector and source evidence</summary>
-
-Open the inspector alongside the market chart to check the outcome, probability basis, latest observation, and collection start time. Its evidence list links to saved source records and official publications; separate tabs expose the Agent workspace and contract details.
-
-![English desktop research inspector showing market context and available source evidence](docs/images/en/research-inspector.png)
-
-</details>
-
-<details>
-<summary>Reproducible signal feed</summary>
-
-Filter deterministic observations by platform and signal type. Each entry exposes the calculation version, probability change, available volume metrics, saved input count, thresholds, and an input export for reproduction.
-
-![English desktop signal feed with filters, versioned calculations, and input exports](docs/images/en/signal-feed.png)
-
-</details>
-
-<details>
-<summary>On-demand specialist research</summary>
-
-Five versioned roles work through a shared research workflow: **quantitative analyst → event intelligence analyst → investment research analyst → risk reviewer → research lead**. The first three receive independent scoped inputs, the reviewer challenges their conclusions, and the lead synthesizes a structured report. Quick single-Agent research is also available.
-
-![English desktop Agent workspace showing five specialist roles before execution](docs/images/en/agent-team.png)
-
-This screenshot shows the team **before execution**, not a completed report. A team run reserves up to five model requests and uses the workspace's configured provider. Page loads and saving settings do not invoke a model. Citation, schema, and forecast checks guard publication; they do not prove a claim is true.
-
-</details>
-
-<details>
-<summary>Event dossiers and official evidence</summary>
-
-Beyond the inspector, event dossiers organize scope, linked contracts, evidence, and changes. Content rules suggest official and media candidates with matching reasons and original snippets. Operators review an exact document version against an exact event definition and can record support or opposition for a specific contract outcome. New versions require a new review; saved-version differences remain inspectable. See the [event evidence guide](docs/event-evidence.md) and the [initial collection check](docs/news-quality-check.md).
-
-![English desktop event dossier with linked contracts, evidence review counts, and a research cutoff](docs/images/en/event-dossier.png)
-
-The example shows 10 linked contracts and 30 evidence entries awaiting review, with no reviewed directly relevant evidence. A source match alone does not establish direct relevance, causation, or support for an outcome. Without the required reviewed evidence and market-quality checks, the Agent must abstain from a probability estimate; qualitative research can continue.
-
-</details>
-
-<details>
-<summary>News and evidence</summary>
-
-Search official economic announcements and selected business news, filter by source or official/media type, and apply a research cutoff to inspect the saved versions available at that time. Each entry distinguishes publication time from first observation, shows its revision and text-capture status, and links to the original source. Full-page text capture is available for the supported Fed release and speech adapters; other sources show feed-only coverage. Inspect current source health and pause/resume collection in Admin. The screenshot below predates the expanded source registry. See the [official evidence guide](docs/official-evidence.md).
-
-![English desktop news and evidence list with search, source filters, document versions, and observation times](docs/images/en/news-evidence.png)
-
-</details>
-
-<details>
-<summary>Data quality and platform administration</summary>
-
-The bilingual Django operations console shows per-market eligibility, collector freshness, coverage, and reasons for unavailable indicators. Operators can distinguish a usable price window from a usable volume baseline instead of interpreting missing metrics as zero.
-
-Its overview brings together tracked markets, active accounts, cleanup-job counts, and exchange collection status. Navigation and shortcuts lead to raw observations, user management, evidence reviews, and cleanup jobs.
-
-![English desktop operations console with collection status, account and cleanup cards, and administration navigation](docs/images/en/admin-overview.png)
-
-Inspect the original exchange JSON alongside its normalized record. Authorized operators can preview and queue raw-payload cleanup, follow background jobs, and inspect audit records. Cleanup preserves normalized analytical history. The console also manages research topics, collection targets, evidence reviews, user status, and operator permissions.
-
-See the [data-quality policy](docs/data-quality.md) and [platform administration guide](docs/platform-administration.md) for these operator workflows.
 
 </details>
 
@@ -187,13 +164,15 @@ React + TypeScript + Vite
 | --- | --- |
 | Rust / Tokio | Exchange ingestion, normalization, batching, durable replay, recovery |
 | Django / Django Ninja | Authentication, organizations, authorization, typed APIs, administration |
-| Python workers | Deterministic analytics, signals, official evidence, Agent jobs, maintenance |
-| PostgreSQL | Transactional application data, market metadata, evidence, research execution metadata |
+| Python workers | Deterministic analytics, signals, official evidence, LangGraph Agent workflows, paper simulation, maintenance |
+| PostgreSQL | Transactional application data, market metadata, evidence, assistant versions, runs, and virtual ledgers |
 | ClickHouse | Historical analytical observations and reproducible signal data |
 | Redis | Ephemeral live state, cache, and coordination |
 | React / TypeScript / Vite | Customer research workspace, charts, language and theme preferences |
 
 Django is the canonical public backend; its ORM owns PostgreSQL schema migrations. ClickHouse uses a dedicated analytical repository. Long-running work stays in independent workers, and the frontend accesses data through Django APIs.
+
+In the paper lab, a qualified signal starts a frozen workflow review. An `ALLOW` result returns to deterministic execution checks, then later order-book snapshots determine simulated fills. Django retains the workflow version, review, order, and virtual ledger for inspection.
 
 **Identity:** `User = identity`, `Organization = workspace`, `Membership = authorization`. Users and organizations use UUIDs; email uniqueness is case-insensitive. OWNER, ADMIN, MEMBER, and VIEWER are organization roles. Platform staff permissions are separate, and tenant isolation is enforced on the server. External identity linkage has a model boundary; provider login is not yet implemented.
 
@@ -226,13 +205,13 @@ Illustrative quick-research JSON; reference IDs are placeholders, not an actual 
 
 | Available now | Planned / not yet implemented |
 | --- | --- |
-| Selected Polymarket/Kalshi REST snapshots and collected history | Broad exchange coverage, streaming trades and order books |
-| Quality-gated metrics, signals, reviewed comparisons, exports | Richer features, lead/lag studies and historical backtesting |
-| Official document versions, event dossiers, paragraph-level relevance reviews | Broader source coverage, linked PDF ingestion, inferred knowledge-graph relationships |
-| On-demand specialist and quick research, frozen inputs, validation diagnostics | Outcome reconciliation, forecast calibration, signal-triggered research and scheduled digests |
-| Workspace watchlists, sampled price/spread alerts, personal read state | External alert delivery, billing, subscriptions, invitations and external login |
+| Workflow canvas, Prompt / Skills, frozen releases, per-node run records | Version diffs and more research-team templates |
+| Saved cloud/local connections, node token caps, workspace allowance | Per-node model selection and versioned configurable risk policies |
+| Prospective paper experiments, multiple assistants, baselines, replayable fills | Paired evaluation on common inputs, role contribution analysis, forecast calibration |
+| Selected REST collection, quality checks, replayable signals, history exports | Broader coverage, streaming trades/order books, full historical backtesting |
+| Source evidence, event dossiers, reviewed comparisons, watchlists and in-app alerts | More sources, external alerts, invitations, external login, subscriptions and billing |
 
-Collected snapshots do not provide a complete tick history or executable liquidity. Cross-platform coverage is curated. Forecasts are conditional and uncalibrated; no measured accuracy or profitability is claimed. The initial focus is research, with macroeconomics and interest rates as the first curated topic.
+Collected snapshots do not provide complete tick history or guaranteed executable liquidity. Macroeconomics and interest rates are the first curated research topic. See the [Agent configuration roadmap](docs/agent-configuration.md) for the next design steps.
 
 ## Production deployment
 
@@ -261,23 +240,18 @@ A single-server Docker Compose configuration is provided in [compose.prod.yaml](
 | [Product scope](docs/product-scope.md), [roadmap](docs/roadmap.md), [automated research](docs/automated-research.md) | Product direction and future work |
 | [AGENTS.md](AGENTS.md) | Architecture and contributor requirements |
 
+Core development guides: [Agent configuration and boundaries](docs/agent-configuration.md) · [Terminal visual design](docs/frontend-terminal.md) · [Isolated tests and CI](docs/testing.md) · [Screenshot provenance](docs/images/README.md).
+
 ## Contributing
 
-Start with the [contribution guide](CONTRIBUTING.md), [report a bug](https://github.com/chongliujia/Quanthecy/issues/new?template=bug_report.yml), or [suggest a feature](https://github.com/chongliujia/Quanthecy/issues/new?template=feature_request.yml). English and Chinese reports are welcome.
-
-Contributions to collection reliability, data quality, evidence review, evaluation, accessibility, and documentation are welcome. Read [AGENTS.md](AGENTS.md), keep changes focused, document changed behavior, and include relevant tests. Never commit credentials, local databases, or private account screenshots.
-
-The container checks are:
+Contributions to collection reliability, data quality, research evaluation, assistant usability, and documentation are welcome. Start with [AGENTS.md](AGENTS.md) and the [contribution guide](CONTRIBUTING.md), [report a bug](https://github.com/chongliujia/Quanthecy/issues/new?template=bug_report.yml), or [suggest a feature](https://github.com/chongliujia/Quanthecy/issues/new?template=feature_request.yml). English and Chinese reports are welcome.
 
 ```bash
-make test-python
-make check-python
-make test-rust
-make test-web
-make check-contracts
+make check       # Isolated stack: Python, Rust, frontend, and contract checks
+make test-down   # Remove the test stack
 ```
 
-Python integration tests use PostgreSQL. Normal tests mock exchange/model calls; optional ClickHouse integration checks are described in the research guides. The [foundation guide](docs/foundation.md) also documents host development workflows.
+Tests use separate PostgreSQL, ClickHouse, and Redis services with mocked exchange and model responses; provider keys are unnecessary. Individual targets include `make test-python`, `make check-python`, `make test-rust`, `make test-web`, and `make check-contracts`. See [testing and CI](docs/testing.md). Never commit credentials, local databases, or private account screenshots.
 
 ## License
 

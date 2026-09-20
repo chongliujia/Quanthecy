@@ -22,6 +22,29 @@ class ModelConfiguration(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
 
+class ModelConnection(models.Model):
+    """Endpoint-scoped saved settings; secrets never move between connections."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    organization = models.ForeignKey("organizations.Organization", on_delete=models.PROTECT)
+    provider = models.CharField(max_length=30)
+    base_url = models.URLField(max_length=500)
+    model = models.CharField(max_length=160, blank=True)
+    encrypted_api_key = models.TextField(blank=True)
+    max_output_tokens = models.PositiveIntegerField(default=2000)
+    context_window_tokens = models.PositiveIntegerField(null=True, blank=True)
+    enable_thinking = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "provider", "base_url"],
+                name="agent_connection_endpoint_unique",
+            )
+        ]
+
+
 class AgentRun(models.Model):
     class State(models.TextChoices):
         PENDING = "PENDING", "Queued"

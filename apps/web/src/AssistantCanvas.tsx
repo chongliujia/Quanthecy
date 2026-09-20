@@ -3,7 +3,7 @@ import { Background, BaseEdge, EdgeLabelRenderer, Handle, MarkerType, MiniMap, P
 import '@xyflow/react/dist/style.css'
 import { t } from './i18n'
 import { nodeDescriptions, nodeNames, type AssistantGraph, type AssistantNode, type NodeKind } from './assistantTypes'
-import { arrangeGraph, canConnect, connectionError, freeNodePosition, graphDirection, graphIssues, type FlowDirection } from './assistantGraph'
+import { arrangeGraph, canConnect, connectionError, freeNodePosition, graphDirection, graphIssues, clampCoordinate, type FlowDirection } from './assistantGraph'
 import AssistantIcon from './AssistantIcon'
 import TerminalDialog from './TerminalDialog'
 
@@ -17,7 +17,7 @@ type FlowEdge = Edge<{ remove: () => void; readonly: boolean }, 'assistant'>
 const WIDTH = 240, HEIGHT = 150
 // Leave room for the floating navigation controls when fitting the graph.
 const FIT_OPTIONS = { padding: { top: '36px', right: '32px', bottom: '88px', left: '32px' }, maxZoom: 1.15 } as const
-const clamp = (value: number) => Math.max(0, Math.min(2000, value))
+const clamp = clampCoordinate
 function AgentNode({ id, data, selected }: NodeProps<FlowNode>) {
   const n = data.node, skills = n.skills?.filter(s => s.enabled).length ?? 0
   const updateInternals = useUpdateNodeInternals()
@@ -140,7 +140,7 @@ export default function AssistantCanvas({ graph, onChange, selected, onSelect, o
       e.preventDefault(); const kind = e.dataTransfer.getData('application/quanthecy-node') as NodeKind
       if (flow && Object.hasOwn(nodeNames, kind)) { const point = flow.screenToFlowPosition({ x: e.clientX, y: e.clientY }); add(kind, { x: point.x - WIDTH / 2, y: point.y - 30 }) }
     }}>
-      <ReactFlow<FlowNode, FlowEdge> nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} onInit={setFlow} fitView={!cache.current} defaultViewport={cache.current?.viewport} fitViewOptions={FIT_OPTIONS} minZoom={.15} maxZoom={1.75} snapToGrid snapGrid={[10, 10]} nodeExtent={[[0, 0], [2000 + WIDTH, 2000 + HEIGHT]]}
+      <ReactFlow<FlowNode, FlowEdge> nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} onInit={setFlow} fitView={!cache.current} defaultViewport={cache.current?.viewport} fitViewOptions={FIT_OPTIONS} minZoom={.15} maxZoom={1.75} snapToGrid snapGrid={[10, 10]} nodeExtent={[[-100000, -100000], [100000 + WIDTH, 100000 + HEIGHT]]}
         nodesDraggable={!readonly} nodesConnectable={!readonly} connectOnClick={false} connectionRadius={28} deleteKeyCode={null} nodesFocusable={false} edgesFocusable={!readonly} zoomOnDoubleClick={false} panActivationKeyCode="Space"
         onMove={(_, v) => setZoom(v.zoom)} onMoveEnd={(_, v) => remember(v)} onNodeDragStart={() => { dragGroup.current += 1 }}
         onNodesChange={changes => { if (readonly) return; const moved = changes.filter(c => c.type === 'position' && c.position); if (!moved.length) return; onChange({ ...graph, nodes: graph.nodes.map(n => { const c = moved.find(c => c.type === 'position' && c.id === n.id); return c?.type === 'position' && c.position ? { ...n, x: clamp(c.position.x), y: clamp(c.position.y) } : n }) }, `drag-${dragGroup.current}`) }}

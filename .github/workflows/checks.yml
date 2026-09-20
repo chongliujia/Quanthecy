@@ -1,0 +1,53 @@
+name: Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Python checks and database integration tests
+        run: make check-python test-python check-contracts
+      - name: Build production backend
+        run: docker build --target production -f apps/backend/Dockerfile .
+      - name: Test service logs
+        if: failure()
+        run: docker compose --env-file /dev/null -p quanthecy-tests -f compose.test.yaml logs --no-color
+      - name: Remove test stack
+        if: always()
+        run: make test-down
+  rust:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - run: make test-rust
+      - name: Build production collector
+        run: docker build --target production -f services/market-data/Dockerfile .
+  web:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - run: make test-web
+      - name: Build production frontend
+        run: docker build --target production -f apps/web/Dockerfile .

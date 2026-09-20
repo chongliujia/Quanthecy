@@ -10,6 +10,13 @@ const { default: ThemeSwitch } = await import('./ThemeSwitch')
 beforeEach(() => { media.matches = false; setThemePreference('system') })
 function systemDark(matches: boolean) { act(() => { media.matches = matches; changes.forEach((callback) => callback()) }) }
 
+it('defaults to dark for a new visitor even when the OS is light', () => {
+  localStorage.removeItem('quanthecy.theme')
+  render(<ThemeSwitch />)
+  expect(screen.getByRole('combobox')).toHaveValue('dark')
+  expect(document.documentElement.dataset.theme).toBe('dark')
+})
+
 it('follows OS changes only when the system option is selected', () => {
   render(<ThemeSwitch />)
   expect(document.documentElement.dataset.theme).toBe('light')

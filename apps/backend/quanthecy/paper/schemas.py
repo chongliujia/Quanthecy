@@ -7,6 +7,15 @@ from ninja import Schema
 from pydantic import Field
 
 
+class PolicyOut(Schema):
+    entry_change_15m: Decimal
+    market_budget_fraction: Decimal
+    event_budget_fraction: Decimal
+    max_spread: Decimal
+    max_quote_age_seconds: int
+    holding_minutes: int
+
+
 class CreateInput(Schema):
     version: Literal["paper-v1", "paper-v2", "paper-v3"] = "paper-v2"
     assistant_version_ids: list[UUID] = Field(default_factory=list, max_length=3)

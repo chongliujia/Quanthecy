@@ -1,12 +1,17 @@
 import { t } from './i18n'
+export type ModelConnection = {
+  id: string; provider: ModelConfiguration['provider']; base_url: string; model: string; has_api_key: boolean
+  max_output_tokens: number; context_window_tokens: number | null; enable_thinking: boolean
+}
 export type ModelConfiguration = {
   revision: number; provider: 'openai' | 'openai_compatible' | 'anthropic' | 'local'; base_url: string; model: string;
   has_api_key: boolean; encryption_available: boolean; enabled: boolean;
   daily_run_limit: number; max_output_tokens: number; allowed_endpoints: string[];
   max_output_tokens_limit?: number;
   context_window_tokens: number | null; enable_thinking: boolean;
+  connections?: ModelConnection[];
 }
-export type AgentStatus = { enabled: boolean; model: string; can_manage: boolean; can_run: boolean; runs_today: number; daily_run_limit: number; configuration_issue?: string }
+export type AgentStatus = { enabled: boolean; model: string; can_manage: boolean; can_run: boolean; runs_today: number; daily_run_limit: number; configuration_issue?: string; max_output_tokens?: number | null }
 export type Claim = { kind: 'OBSERVATION' | 'HYPOTHESIS' | 'EXPLANATION'; text: string; references: string[] }
 export type Forecast = { status: 'ESTIMATE' | 'ABSTAIN'; target: 'YES_AT_CONTRACT_RESOLUTION'; probability: number | null; lower: number | null; upper: number | null; rationale: Claim; assumptions: string[]; invalidation_triggers: string[]; calibration: 'UNCALIBRATED' }
 export type Report = { action: 'IGNORE' | 'WATCH' | 'INVESTIGATE'; confidence: number; thesis: Claim; claims: Claim[]; counter_evidence: Claim[]; key_signals: string[]; risk_flags: string[]; follow_up: string[]; disagreements?: Claim[]; forecast?: Forecast }
@@ -14,7 +19,7 @@ export type ResearchSkill = { id: string; name: string; responsibility: string; 
 export type SpecialistOutput = { summary: Claim; findings: Claim[]; challenges: Claim[]; limitations: string[]; watch_for: string[] }
 export type FormatAdjustment = { field: 'limitations' | 'watch_for' | 'risk_flags' | 'follow_up'; original_count: number; grouped_count: number; method: 'consecutive_text_grouping_v1' }
 export type ValidationIssue = { field: string; code: string }
-export type AgentStep = { id: string; name: string; skill_version: string; skill?: ResearchSkill | null; state: string; output: SpecialistOutput | Report | null; started_at: string; finished_at: string | null; error_code: string; validation_errors?: ValidationIssue[]; format_adjustments?: FormatAdjustment[]; usage: Record<string, number>; input_manifest: { cutoff: string; context_sha256: string; reference_ids: string[]; omitted_reference_ids: string[]; reference_bytes: number; dependencies: string[] } }
+export type AgentStep = { model_settings?: { provider: string; model: string; configuration_revision: number; max_output_tokens: number } | null; id: string; name: string; skill_version: string; skill?: ResearchSkill | null; state: string; output: SpecialistOutput | Report | null; started_at: string; finished_at: string | null; error_code: string; validation_errors?: ValidationIssue[]; format_adjustments?: FormatAdjustment[]; usage: Record<string, number>; input_manifest: { cutoff: string; context_sha256: string; reference_ids: string[]; omitted_reference_ids: string[]; reference_bytes: number; dependencies: string[] } }
 export type ResearchReference = { id: string; kind: string; label: string; value?: unknown; url?: string }
 export type AgentRun = { id: string; market_id: string | null; kind: string; state: string; stage: string; cutoff: string; configuration_revision: number; model: string; prompt_version: string; workflow?: 'single' | 'team'; language?: 'zh' | 'en'; reserved_calls?: number; steps?: AgentStep[]; report: Report | null; usage: Record<string, number>; error_code: string; validation_errors?: ValidationIssue[]; created_at: string; finished_at: string | null; context?: { references: ResearchReference[]; limitations: string[]; quality?: { history_ready: boolean; stale: boolean; forecast_eligible: boolean }; manifest?: { sha256: string; reference_count: number; observation_count: number; window_minutes: number } } }
 export const activeRun = (run: AgentRun) => ['PENDING', 'RUNNING'].includes(run.state)

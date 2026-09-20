@@ -34,7 +34,8 @@ function setup() {
     const path = String(url)
     if (path.endsWith('/auth/csrf')) return response({ csrf_token: 'test' })
     if (path.endsWith('/candidates')) return response([{ id: 'm1', title: 'Election market' }])
-    if (path.endsWith('/agent/status')) return response({ can_run: true, enabled: true, model: 'fixture', daily_run_limit: 20, runs_today: 0 })
+    if (path.endsWith('/agent/status')) return response({ can_run: true, enabled: true, model: 'fixture', daily_run_limit: 20, runs_today: 0, max_output_tokens: 4096 })
+    if (path.endsWith('/paper/policy')) return response({ entry_change_15m: '.02', market_budget_fraction: '.01', event_budget_fraction: '.02', max_spread: '.08', max_quote_age_seconds: 90, holding_minutes: 60 })
     if (path.endsWith('/publish')) return response({ id: 'v1', assistant_id: 'a1', number: 1, name: saved.name, graph: saved.draft, graph_hash: 'abc', runtime_version: 'paper-assistant-v1', created_at: '2026-09-18T12:00:00Z' })
     if (path.endsWith('/a1') && init?.method === 'PUT') {
       const payload = JSON.parse(String(init.body))
@@ -83,6 +84,20 @@ it('moves nodes with keyboard access and rejects cycles or a risk bypass', () =>
   expect(arranged.nodes[1].y).toBeLessThan(arranged.nodes[2].y)
 })
 
+it('moves left across the canvas origin and persists negative positions', async () => {
+  const fetch = setup()
+  render(<AssistantBuilder userId="u1" organization={org} onCompare={vi.fn()} />, { wrapper: wrapper() })
+  const node = await screen.findByRole('button', { name: 'Select node Quantitative analyst' })
+  for (let i = 0; i < 5; i++) fireEvent.keyDown(node, { key: 'ArrowLeft' })
+  fireEvent.click(screen.getByRole('button', { name: 'Save draft' }))
+  await screen.findByText('Draft saved.')
+  const saved = JSON.parse(String(fetch.mock.calls.find(([, init]) => init?.method === 'PUT')?.[1]?.body))
+  expect(saved.graph.nodes[0].x).toBe(-50)
+  expect(saved.graph.nodes[0].y).toBe(50)
+  const point = freeNodePosition(graph, { x: -400, y: -200 })
+  expect(point).toEqual({ x: -400, y: -200 })
+})
+
 function InspectorHarness() {
   const [node, setNode] = useState(graph.nodes[0])
   return <AssistantNodeInspector node={node} graph={graph} readonly={false} onPatch={patch => setNode(n => ({ ...n, ...patch }))} onGraph={vi.fn()} onRemove={vi.fn()} />
@@ -127,6 +142,60 @@ it('starts a version-bound comparison with an explicit virtual-capital action', 
   await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/v1/organizations/org1/paper', expect.objectContaining({ method: 'POST', body: expect.stringContaining('"assistant_version_ids":["v1"]') })))
 })
 
+it('shows team responsibilities and real policy, then edits the selected node budget', async () => {
+  const fetch = setup()
+  render(<AssistantBuilder userId="u1" organization={org} onCompare={vi.fn()} />, { wrapper: wrapper() })
+  fireEvent.click(await screen.findByRole('button', { name: 'Configuration' }))
+  expect(await screen.findByText('Per-market capital cap')).toBeVisible()
+  expect(screen.getByText('6,144')).toBeVisible()
+  expect(screen.getByText('Independent analysis')).toBeVisible()
+  expect(screen.getByText('ALLOW / REJECT / WAIT with cited reasons')).toBeVisible()
+  fireEvent.click(screen.getAllByRole('button', { name: 'Model' })[0])
+  const input = await screen.findByLabelText('Node output token limit')
+  fireEvent.change(input, { target: { value: '512' } })
+  expect(screen.getAllByText('512')).toHaveLength(2)
+  fireEvent.click(screen.getByRole('button', { name: 'Save draft' }))
+  await screen.findByText('Draft saved.')
+  expect(fetch).toHaveBeenCalledWith('/api/v1/organizations/org1/assistants/a1', expect.objectContaining({ method: 'PUT', body: expect.stringContaining('"max_output_tokens":512') }))
+  expect(fetch.mock.calls.some(([path]) => String(path).endsWith('/trial'))).toBe(false)
+})
+
+it('blocks invalid node budgets and preserves inherited limits when cleared', async () => {
+  setup()
+  render(<AssistantBuilder userId="u1" organization={org} onCompare={vi.fn()} />, { wrapper: wrapper() })
+  fireEvent.click(await screen.findByRole('tab', { name: 'Model' }))
+  const input = screen.getByLabelText('Node output token limit')
+  fireEvent.change(input, { target: { value: '255' } })
+  expect(screen.getByRole('button', { name: 'Save draft' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: /Publish version/ })).toBeDisabled()
+  fireEvent.change(input, { target: { value: '' } })
+  expect(screen.getByText('4,096')).toBeVisible()
+  expect(screen.getByText('2,048')).toBeVisible()
+})
+
+it('appends a role-specific method without losing existing instructions and supports undo', async () => {
+  setup()
+  render(<AssistantBuilder userId="u1" organization={org} onCompare={vi.fn()} />, { wrapper: wrapper() })
+  const prompt = await screen.findByLabelText('Node prompt')
+  fireEvent.change(prompt, { target: { value: 'Keep my research focus.' } })
+  fireEvent.click(screen.getByText('Role checklist'))
+  fireEvent.click(screen.getByRole('button', { name: 'Append checklist to prompt' }))
+  expect((prompt as HTMLTextAreaElement).value).toContain('Keep my research focus.')
+  expect((prompt as HTMLTextAreaElement).value).toContain('do not recalculate them')
+  expect(screen.getByRole('button', { name: 'Append checklist to prompt' })).toBeDisabled()
+  fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+  expect(prompt).toHaveValue('Keep my research focus.')
+})
+
+it('keeps model and entry settings read-only for viewers', async () => {
+  setup()
+  render(<AssistantBuilder userId="u1" organization={{ ...org, role: 'VIEWER' }} onCompare={vi.fn()} />, { wrapper: wrapper() })
+  fireEvent.click(await screen.findByRole('tab', { name: 'Model' }))
+  expect(screen.getByLabelText('Node output token limit')).toBeDisabled()
+  fireEvent.click(screen.getByRole('button', { name: 'Configuration' }))
+  expect(screen.getByLabelText('Minimum 15m movement (pp)')).toBeDisabled()
+})
+
 it('lays out both directions without losing configuration and places new nodes without overlap', () => {
   const configured = { ...graph, nodes: graph.nodes.map(n => ({ ...n, prompt: 'Keep my method', skills: [{ name: 'SKILL.md', content: '# Method', enabled: true }] })) }
   for (const direction of ['horizontal', 'vertical'] as const) {
@@ -136,10 +205,10 @@ it('lays out both directions without losing configuration and places new nodes w
     expect(arranged.nodes.map(n => ({ ...n, x: 0, y: 0 }))).toEqual(configured.nodes.map(n => ({ ...n, x: 0, y: 0 })))
     const position = freeNodePosition(arranged, arranged.nodes[0])
     expect(arranged.nodes.every(n => Math.abs(n.x - position.x) >= 250 || Math.abs(n.y - position.y) >= 168)).toBe(true)
-    expect(position.x).toBeGreaterThanOrEqual(0)
-    expect(position.x).toBeLessThanOrEqual(2000)
-    expect(position.y).toBeGreaterThanOrEqual(0)
-    expect(position.y).toBeLessThanOrEqual(2000)
+    expect(position.x).toBeGreaterThanOrEqual(-100000)
+    expect(position.x).toBeLessThanOrEqual(100000)
+    expect(position.y).toBeGreaterThanOrEqual(-100000)
+    expect(position.y).toBeLessThanOrEqual(100000)
   }
 })
 

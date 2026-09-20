@@ -56,10 +56,9 @@ function Workspace({ user }: { user: User }) {
   const [name, setName] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const route = useRoute()
-  const [navCollapsed, setNavCollapsed] = useLayoutPreference(`quanthecy.nav.${user.id}`, true, (value): value is boolean => typeof value === 'boolean')
+  const [navCollapsed, setNavCollapsed] = useLayoutPreference(`quanthecy.nav.${user.id}`, window.matchMedia('(max-width: 640px)').matches, (value): value is boolean => typeof value === 'boolean')
   const cutoff = route.params.get('cutoff') ?? ''
-  const navigation = [['overview', t("Research overview"), '01'], ['watchlists', t('Watchlists & alerts'), '09'], ['markets', t("Market explorer"), '02'], ['signals', t("Signal feed"), '03'], ['comparisons', t("Cross-platform"), '04'], ['evidence', t("News & evidence"), '05'], ['events', t('Event dossiers'), '08'], ['workspace', t("Workspace & members"), '06'], ['model-settings', t("Model settings"), '07']]
-  navigation.splice(2, 0, ['paper', t('Paper trading lab'), '10'])
+  const navigation = [['overview', t("Research overview"), 'MARKETS'], ['markets', t("Market explorer"), ''], ['watchlists', t('Watchlists & alerts'), ''], ['signals', t("Signal feed"), ''], ['comparisons', t("Cross-platform"), 'RESEARCH'], ['evidence', t("News & evidence"), ''], ['events', t('Event dossiers'), ''], ['paper', t('Paper trading lab'), ''], ['model-settings', t("Model settings"), 'WORKSPACE'], ['workspace', t("Workspace & members"), '']]
   const heading = navigation.find(([path]) => path === route.page)?.[1] ?? t("Page not found")
   const organizations = useQuery({ queryKey: ['organizations', user.id], queryFn: () => api<Organization[]>('/organizations?limit=100') })
   const active = organizations.data?.find((org) => org.id === selected) ?? organizations.data?.[0]
@@ -77,8 +76,8 @@ function Workspace({ user }: { user: User }) {
         {organizations.data?.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}
       </select>
       <button className="secondary" onClick={() => setShowCreate(!showCreate)}>{t("+ New workspace")}</button>
-      <nav aria-label={t("Research navigation")}>{navigation.map(([path, label]) => <a key={path} title={label} aria-label={label} href={`#/${path}`} aria-current={route.page === path ? 'page' : undefined} className={route.page === path ? 'nav-current' : 'nav-link'}><span className="nav-icon"><NavIcon page={path} /></span><span className="nav-label">{label}</span></a>)}</nav>
-      <div className="sidebar-focus"><span className="eyebrow">{t("CURRENT RESEARCH")}</span><p>{t("Macro & rates")}</p><small>{t("Market data → rules → evidence")}</small></div>
+      <nav aria-label={t("Research navigation")}>{navigation.map(([path, label, group]) => <div className="nav-entry" key={path}>{group && <span className="nav-group">{t(group)}</span>}<a title={label} aria-label={label} href={`#/${path}`} aria-current={route.page === path ? 'page' : undefined} className={route.page === path ? 'nav-current' : 'nav-link'}><span className="nav-icon"><NavIcon page={path} /></span><span className="nav-label">{label}</span></a></div>)}</nav>
+      <div className="sidebar-focus"><span className="eyebrow">QUANTHECY / RESEARCH</span><p>Polymarket <span>×</span> Kalshi</p><small>{t("Market data → rules → evidence")}</small></div>
       <div className="account"><span>{user.email}</span><button className="text-button" onClick={() => logout.mutate()} disabled={logout.isPending}>{t("Sign out")}</button></div>
       {logout.error && <p role="alert" className="error">{t(logout.error.message)}</p>}
     </aside>

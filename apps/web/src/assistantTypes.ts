@@ -2,7 +2,7 @@ import type { AgentStep, Claim } from './agentTypes'
 
 export type NodeKind = 'quant' | 'events' | 'pricing' | 'risk' | 'review'
 export type NodeSkillFile = { name: string; content: string; enabled: boolean }
-export type AssistantNode = { id: string; kind: NodeKind; label: string; instructions: string; prompt?: string; skills?: NodeSkillFile[]; x: number; y: number }
+export type AssistantNode = { id: string; kind: NodeKind; label: string; instructions: string; prompt?: string; skills?: NodeSkillFile[]; max_output_tokens?: number | null; x: number; y: number }
 export type AssistantGraph = { schema_version: 1; nodes: AssistantNode[]; edges: { source: string; target: string }[]; entry_change_15m: number }
 export type AssistantVersion = { id: string; assistant_id: string; number: number; name: string; graph: AssistantGraph; graph_hash: string; runtime_version: string; created_at: string }
 export type Assistant = { id: string; name: string; revision: number; is_default: boolean; draft: AssistantGraph; versions: AssistantVersion[]; updated_at: string }

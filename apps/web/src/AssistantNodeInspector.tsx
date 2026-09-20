@@ -4,6 +4,9 @@ import { nodeDescriptions, nodeNames, type AssistantGraph, type AssistantNode, t
 import { canConnect, skillError } from './assistantGraph'
 import AssistantIcon from './AssistantIcon'
 import TerminalDialog from './TerminalDialog'
+import type { AgentStatus } from './agentTypes'
+import AssistantNodeModel from './AssistantNodeModel'
+import { nodeConfigurationError, roleChecklists } from './assistantConfiguration'
 
 function readMarkdown(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -22,10 +25,10 @@ function download(file: NodeSkillFile) {
   setTimeout(() => URL.revokeObjectURL(url), 1000)
 }
 
-export default function AssistantNodeInspector({ node, graph, readonly, onPatch, onGraph, onRemove, initialTab = 'prompt' }: {
+export default function AssistantNodeInspector({ node, graph, readonly, onPatch, onGraph, onRemove, initialTab = 'prompt', status }: {
   node: AssistantNode; graph: AssistantGraph; readonly: boolean
   onPatch: (patch: Partial<AssistantNode>) => void; onGraph: (graph: AssistantGraph) => void; onRemove: () => void
-  initialTab?: 'prompt' | 'skills'
+  initialTab?: 'prompt' | 'skills' | 'model' | 'inputs'; status?: AgentStatus
 }) {
   const [tab, setTab] = useState(initialTab as string), [fileIndex, setFileIndex] = useState(0)
   const [expanded, setExpanded] = useState(false), [uploading, setUploading] = useState(false), [error, setError] = useState('')
@@ -37,7 +40,9 @@ export default function AssistantNodeInspector({ node, graph, readonly, onPatch,
   const disabled = readonly || uploading
   const patchFiles = (next: NodeSkillFile[]) => { setError(''); onPatch({ skills: next }) }
   const patchFile = (patch: Partial<NodeSkillFile>) => patchFiles(files.map((s, i) => i === fileIndex ? { ...s, ...patch } : s))
-  const problem = skillError(files, node.prompt ?? '', node.instructions)
+  const problem = nodeConfigurationError(node)
+  const checklist = roleChecklists[node.kind].map(line => `- ${t(line)}`).join('\n')
+  const withChecklist = [node.instructions, node.prompt, checklist].filter(Boolean).join('\n\n')
   const upload = async (incoming: FileList | null) => {
     if (!incoming?.length || disabled) return
     setError(''); setUploading(true)
@@ -64,9 +69,11 @@ export default function AssistantNodeInspector({ node, graph, readonly, onPatch,
     <div className="assistant-inspector-heading"><span className="assistant-node-icon"><AssistantIcon kind={node.kind} /></span><div><small>{t('Node configuration')}</small><strong>{t(nodeNames[node.kind])}</strong></div><span className="badge">{t(['risk', 'review'].includes(node.kind) ? 'Required' : 'Agent')}</span></div>
     <label className="assistant-node-name">{t('Node name')}<input value={t(node.label)} maxLength={80} disabled={disabled} onChange={e => onPatch({ label: e.target.value })} /></label>
     <div className="assistant-inspector-tabs" role="tablist" aria-label={t('Node configuration')}>
-      {[['prompt', 'Prompt'], ['skills', 'Skills'], ['inputs', 'Inputs']].map(([id, title]) => <button key={id} role="tab" id={`node-tab-${id}`} aria-controls={`node-panel-${id}`} aria-selected={tab === id} onClick={() => setTab(id)}>{t(title)}{id === 'skills' && <span>{files.length}</span>}</button>)}
+      {[['prompt', 'Prompt'], ['skills', 'Skills'], ['inputs', 'Inputs'], ['model', 'Model']].map(([id, title]) => <button key={id} role="tab" id={`node-tab-${id}`} aria-controls={`node-panel-${id}`} aria-selected={tab === id} onClick={() => setTab(id)}>{t(title)}{id === 'skills' && <span>{files.length}</span>}</button>)}
     </div>
     <div className="assistant-inspector-content" role="tabpanel" id={`node-panel-${tab}`} aria-labelledby={`node-tab-${tab}`}>
+      {tab === 'model' && <AssistantNodeModel node={node} status={status} disabled={disabled} onPatch={onPatch} />}
+      {tab === 'prompt' && <details className="assistant-role-playbook"><summary>{t('Role checklist')}</summary><ul>{roleChecklists[node.kind].map(line => <li key={line}>{t(line)}</li>)}</ul><button disabled={disabled || withChecklist.length > 8000 || prompt.includes(checklist) || !!skillError(files, withChecklist, '')} onClick={() => onGraph({ ...graph, nodes: graph.nodes.map(n => n.id === node.id ? { ...n, prompt: withChecklist, instructions: '' } : n) })}>{t('Append checklist to prompt')}</button><small>{t('Adds an editable method to this draft and keeps your existing instructions.')}</small></details>}
       {tab === 'prompt' && <><p className="assistant-role-note">{t(nodeDescriptions[node.kind])}</p><div className="assistant-field-toolbar"><span>{t('Instructions for this agent')}</span><button onClick={() => setExpanded(true)}>{t('Expand editor')} ↗</button></div>{!expanded && promptEditor()}{!prompt && <button className="assistant-text-button" disabled={disabled} onClick={() => onPatch({ instructions: '', prompt: `${t(nodeDescriptions[node.kind])}\n\n${t('Separate observations from hypotheses. Cite the supplied evidence, challenge assumptions and state what would change your conclusion.')}` })}>{t('Insert starter prompt')}</button>}<p className="assistant-help">{t('Your prompt supplements the role. Structured output and evidence rules are applied automatically.')}</p>{node.prompt && node.instructions && <p className="assistant-help">{t('Legacy research focus')}: {node.instructions}</p>}</>}
       {tab === 'skills' && <><p className="assistant-help">{t('Attach reusable research methods. Enabled files are included in this node’s model input.')}</p><div className="assistant-skill-actions"><button disabled={disabled || files.length >= 5} onClick={() => { let name = 'SKILL.md'; for (let n = 2; files.some(s => s.name.toLowerCase() === name.toLowerCase()); n++) name = `skill-${n}.md`; patchFiles([...files, { name, content: '', enabled: true }]); setFileIndex(files.length) }}>＋ {t('New skill')}</button><button disabled={disabled || files.length >= 5} onClick={() => fileInput.current?.click()}><AssistantIcon kind="upload" />{t(uploading ? 'Importing…' : 'Upload .md')}</button><input ref={fileInput} type="file" accept=".md,text/markdown" multiple hidden aria-label={t('Upload skill files')} disabled={disabled} onChange={e => void upload(e.target.files)} /></div>
         {error && <p role="alert" className="error">{t(error)}</p>}

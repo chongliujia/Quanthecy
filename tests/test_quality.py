@@ -1,5 +1,6 @@
 import copy
 import json
+import math
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -138,3 +139,75 @@ def test_adapter_partial_flags_only_block_the_affected_indicator(rows, missing):
     assert metrics["quality"]["price_usable"] is (missing != "bid")
     assert metrics["quality"]["volume_usable"] is (missing != "volume")
     assert signals
+
+
+@pytest.mark.parametrize("direction", [-1, 1])
+def test_serialization_noise_does_not_invalidate_volume_or_mutate_inputs(rows, direction):
+    # The September audit found a four-ULP decrease at this counter size.
+    base = 48732713.555604056
+    for row in rows:
+        row["volume"]["value"] += base
+    previous = rows[5]["volume"]["value"]
+    rows[6]["volume"]["value"] = previous + direction * 4 * math.ulp(previous)
+    original = copy.deepcopy(rows)
+    metrics, signals = analyze(rows)
+    assert metrics["quality"]["volume_usable"]
+    assert metrics["volume_zscore"] is not None
+    assert "VOLUME_SPIKE" in {s["signal_type"] for s in signals}
+    assert rows == original
+    assert analyze(list(reversed(rows)) + [rows[6]]) == (metrics, signals)
+    if direction == -1:
+        legacy, _ = replay("rest-window-v2", rows)
+        assert legacy["quality"]["volume_reasons"] == ["volume_counter_reset"]
+
+
+def test_precision_only_activity_keeps_constant_baseline_unavailable(rows):
+    base = 48732713.555604056
+    for index, row in enumerate(rows):
+        row["volume"]["value"] = base + (index % 3 - 1) * 4 * math.ulp(base)
+    metrics, signals = analyze(rows)
+    assert metrics["quality"]["volume_reasons"] == ["constant_volume_baseline"]
+    assert metrics["volume_rate"] == 0
+    assert metrics["volume_zscore"] is None
+    assert "VOLUME_SPIKE" not in {s["signal_type"] for s in signals}
+
+
+def test_small_negative_final_increment_uses_zero_rate_instead_of_reset(rows):
+    previous = rows[-2]["volume"]["value"]
+    rows[-1]["volume"]["value"] = previous - 5e-10
+    metrics, signals = analyze(rows)
+    assert metrics["quality"]["volume_usable"]
+    assert metrics["volume_rate"] == 0
+    assert metrics["volume_zscore"] < 0
+    assert "VOLUME_SPIKE" not in {s["signal_type"] for s in signals}
+
+
+@pytest.mark.parametrize("base,drop", [(1.0, 1e-8), (48732713.0, 0.01), (1e12, 0.01)])
+def test_real_decrease_remains_a_reset_even_for_large_counters(rows, base, drop):
+    for row in rows:
+        row["volume"]["value"] += base
+    rows[-1]["volume"]["value"] = rows[-2]["volume"]["value"] - drop
+    metrics, signals = analyze(rows)
+    assert metrics["quality"]["volume_reasons"] == ["volume_counter_reset"]
+    assert metrics["quality"]["price_usable"]
+    assert "VOLUME_SPIKE" not in {s["signal_type"] for s in signals}
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), -1, True])
+def test_invalid_counters_cannot_be_hidden_by_tolerance(rows, value):
+    rows[6]["volume"]["value"] = value
+    metrics, _ = analyze(rows)
+    assert not metrics["quality"]["volume_usable"]
+    assert "invalid_volume" in metrics["quality"]["volume_reasons"]
+
+
+def test_old_quality_requires_recalculation_and_new_signal_ids_are_distinct(rows):
+    old_metrics, old_signals = replay("rest-window-v2", rows)
+    metrics, signals = analyze(rows)
+    assert old_metrics["quality"]["version"] == "research-quality-v1"
+    assert metrics["quality"]["version"] == "research-quality-v2"
+    assert metrics["version"] == "rest-window-v3"
+    assert {s["id"] for s in signals}.isdisjoint(s["id"] for s in old_signals)
+    assert replay("rest-window-v3", rows) == (metrics, signals)
+    at = datetime.fromisoformat(rows[-1]["received_at"])
+    assert "quality_not_evaluated" in research_quality(rows[-1], old_metrics, at).reasons

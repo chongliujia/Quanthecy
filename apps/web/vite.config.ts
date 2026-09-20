@@ -11,5 +11,6 @@ export default defineConfig({
       '/static': { target: process.env.BACKEND_URL ?? 'http://localhost:8000' },
     },
   },
-  test: { environment: 'jsdom', setupFiles: ['./src/test-setup.ts'] },
+  // Bound jsdom workers so Docker/CI does not start one heavy environment per host CPU.
+  test: { environment: 'jsdom', setupFiles: ['./src/test-setup.ts'], maxWorkers: 2 },
 })

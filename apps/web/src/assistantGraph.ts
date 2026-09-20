@@ -56,10 +56,12 @@ export function arrangeGraph(graph: AssistantGraph, direction: FlowDirection = '
   }) }
 }
 
+export const clampCoordinate = (value: number) => Math.max(-100000, Math.min(100000, value))
+
 export function freeNodePosition(graph: AssistantGraph, preferred: { x: number; y: number }) {
-  const x = Math.max(0, Math.min(2000, Math.round(preferred.x / 10) * 10)), y = Math.max(0, Math.min(2000, Math.round(preferred.y / 10) * 10))
+  const x = clampCoordinate(Math.round(preferred.x / 10) * 10), y = clampCoordinate(Math.round(preferred.y / 10) * 10)
   const candidates = [{ x, y }]
-  for (let row = 0; row <= 2000; row += 190) for (let col = 0; col <= 2000; col += 270) candidates.push({ x: col, y: row })
+  for (let row = -8; row <= 8; row++) for (let col = -8; col <= 8; col++) candidates.push({ x: clampCoordinate(x + col * 270), y: clampCoordinate(y + row * 190) })
   candidates.sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y))
   return candidates.find(p => graph.nodes.every(n => Math.abs(n.x - p.x) >= 250 || Math.abs(n.y - p.y) >= 168)) ?? { x, y }
 }

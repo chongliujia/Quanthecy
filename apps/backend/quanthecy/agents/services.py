@@ -74,6 +74,7 @@ def status(actor: User, organization_id: UUID) -> AgentStatus:
         runs_today=runs_today(organization_id),
         daily_run_limit=config.daily_run_limit if config else 10,
         configuration_issue=issue,
+        max_output_tokens=config.max_output_tokens if config else None,
     )
 
 

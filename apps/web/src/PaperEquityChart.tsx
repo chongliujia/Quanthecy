@@ -20,8 +20,9 @@ export default function PaperEquityChart({ accounts }: { accounts: PaperAccount[
     const colors = chartColors(theme)
     chart.setOption({
       color: [colors.news, colors.line, colors.spread],
-      grid: { left: 70, right: 22, top: 45, bottom: 35 },
-      legend: { textStyle: { color: colors.text } },
+      grid: { left: 64, right: 18, top: 48, bottom: 30 },
+      legend: { type: 'scroll', top: 0, left: 'center', textStyle: { color: colors.text, fontSize: 11 }, pageTextStyle: { color: colors.muted }, pageIconColor: colors.text, pageIconInactiveColor: colors.border },
+      textStyle: { fontFamily: 'ui-monospace, SFMono-Regular, Consolas, monospace' },
       tooltip: { trigger: 'axis', renderMode: 'richText', valueFormatter: (value: unknown) => value == null ? '—' : Number(value).toFixed(2) },
       xAxis: { type: 'time', axisLabel: { color: colors.muted }, axisLine: { lineStyle: { color: colors.border } } },
       yAxis: { type: 'value', scale: true, axisLabel: { color: colors.muted }, splitLine: { lineStyle: { color: colors.grid } } },

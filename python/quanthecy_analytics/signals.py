@@ -7,8 +7,9 @@ from typing import Any
 from uuid import NAMESPACE_URL, uuid5
 
 from .quality import BAD_FLAGS, window_quality
+from .volume import ABSOLUTE_TOLERANCE, ULP_TOLERANCE, cumulative_delta
 
-VERSION = "rest-window-v2"
+VERSION = "rest-window-v3"
 PARAMETERS = {
     "window_seconds": 900,
     "max_gap_seconds": 150,
@@ -17,6 +18,8 @@ PARAMETERS = {
     "spread_widening": 0.03,
     "volume_zscore": 3.0,
     "volume_rate_ratio": 2.0,
+    "volume_absolute_tolerance": ABSOLUTE_TOLERANCE,
+    "volume_ulp_tolerance": ULP_TOLERANCE,
 }
 
 
@@ -123,7 +126,7 @@ def analyze(
     volumes = [o["volume"] for o in rows]
     if quality.volume_usable:
         rates = [
-            (b["value"] - a["value"]) / d
+            cumulative_delta(a["value"], b["value"]) / d
             for a, b, d in zip(volumes, volumes[1:], deltas, strict=False)
         ]
         if all(r >= 0 and math.isfinite(r) for r in rates):
@@ -157,6 +160,10 @@ def replay(
         from .signals_v1 import analyze as legacy_analyze
 
         return legacy_analyze(observations)
+    if version == "rest-window-v2":
+        from .signals_v2 import analyze as v2_analyze
+
+        return v2_analyze(observations)
     if version == VERSION:
         return analyze(observations)
     raise ValueError("Unsupported signal calculation version")

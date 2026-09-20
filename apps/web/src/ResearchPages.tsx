@@ -4,8 +4,10 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from './api'
 import { withCutoff } from './navigation'
 import { Empty, ErrorNotice, EvidenceCard, ResearchTime } from './ResearchUI'
-import { change, probability, readable, time } from './format'
+import { change, changeTone, probability, readable, time } from './format'
 import type { Comparison, Evidence, EvidenceDetail, FeedSignal, Overview, Quote, Review, Timeline, SourcePage } from './researchTypes'
+
+import type { Market } from './marketTypes'
 
 import OfficialDocumentPanel from './OfficialDocumentPanel'
 import NewsSources, { SourceStatus } from './NewsSources'
@@ -14,34 +16,51 @@ const ComparisonChart = lazy(() => import('./ComparisonChart'))
 
 function PairCard({ review, cutoff = '' }: { review: Review; cutoff?: string }) {
   return <a className="panel pair-card" href={`#${withCutoff(`/comparisons/${review.comparison_id}`, cutoff)}`}>
-    <div className="section-heading"><span className="eyebrow">{review.topic}</span><span className={`badge ${review.relation !== 'EQUIVALENT' ? 'badge-amber' : ''}`}>{readable(review.relation)}</span></div>
+    <div className="section-heading"><span className="eyebrow">{t(review.topic)}</span><span className={`badge ${review.relation !== 'EQUIVALENT' ? 'badge-amber' : ''}`}>{readable(review.relation)}</span></div>
     <h3>{review.title}</h3><p>{review.rationale}</p><div className="pair-platforms"><span>{review.left_snapshot.platform}</span><span>↔</span><span>{review.right_snapshot.platform}</span></div>
     <div className="card-bottom"><small>{t("Review v")}{review.version} · {time(review.reviewed_at)}</small><span aria-hidden="true">↗</span></div>
   </a>
+}
+
+function OverviewMovers({ userId }: { userId: string }) {
+  const query = useQuery({ queryKey: ['overview-movers', userId], queryFn: () => api<{ items: Market[]; total: number }>('/markets?limit=6&sort=movement'), refetchInterval: 30000 })
+  return <section className="panel overview-movers">
+    <div className="section-heading"><div><span className="eyebrow">{t('MARKET MONITOR')}</span><h2>{t('Largest 15m movement')}</h2></div><a className="text-button" href="#/markets">{t('Explore all markets →')}</a></div>
+    {query.isPending && <p role="status">{t('Loading markets…')}</p>}
+    {query.error && <ErrorNotice error={query.error} retry={() => void query.refetch()} />}
+    {query.data && (query.data.items.length ? <div className="table-scroll" tabIndex={0} role="region" aria-label={t('Largest 15m movement')}><table className="movers-table"><thead><tr><th>{t('Market')}</th><th>{t('Probability')}</th><th>{t('15m change')}</th></tr></thead><tbody>{query.data.items.map((market, index) => {
+      const delta = market.metrics.probability_change_15m
+      return <tr key={market.id}><td><div className="mover-name"><span className="row-index">{String(index + 1).padStart(2, '0')}</span><div><a href={`#/markets/${market.id}`}>{market.title}</a><small><span className={`exchange-indicator ${market.platform}`} />{market.platform} · {time(market.last_observed_at)}</small></div></div></td><td className="numeric">{probability(market.probability)}</td><td className={`numeric ${changeTone(delta, market.stale)}`}>{change(delta)}</td></tr>
+    })}</tbody></table></div> : <div className="monitor-empty"><span aria-hidden="true">↗</span><h3>{t('No qualifying movement yet')}</h3><p>{t('Fresh, comparable observations will appear here as history builds.')}</p><a href="#/markets" className="text-button">{t('Explore all markets →')}</a></div>)}
+    <div className="monitor-footer"><span>{t('Fresh, comparable observations only')}</span><span>{t('Change in percentage points')}</span></div>
+  </section>
 }
 
 export function ResearchOverview({ userId }: { userId: string }) {
   const overview = useQuery({ queryKey: ['research-overview', userId], queryFn: () => api<Overview>('/research/overview'), refetchInterval: 30000 })
   const pairs = useQuery({ queryKey: ['comparisons', userId, ''], queryFn: () => api<Review[]>('/comparisons'), refetchInterval: 60000 })
   const news = useQuery({ queryKey: ['evidence-preview', userId], queryFn: () => api<{ items: Evidence[]; total: number }>('/evidence?limit=3'), refetchInterval: 60000 })
-  return <>
-    <section className="research-hero"><div><span className="eyebrow">{t("FOCUS / 01")}</span><h2>{t("Macro & interest rates")}</h2><p>{t("Follow the Fed, compare what contracts actually settle on, and inspect the evidence behind market activity.")}</p><div className="hero-links"><a className="primary button-link" href="#/comparisons">{t("Compare markets ↗")}</a><a href="#/markets">{t("Explore all markets →")}</a></div></div><div className="hero-aside"><span className="eyebrow">{t("RESEARCH WORKFLOW")}</span><ol><li>{t("Observe the market")}</li><li>{t("Read the contract")}</li><li>{t("Check the evidence")}</li></ol><small>{t("Polymarket + Kalshi · Selected coverage")}</small></div></section>
-    {overview.isPending && <p role="status">{t("Loading research coverage…")}</p>}
+  return <div className="overview-workstation">
+    <section className="overview-heading"><div><span className="eyebrow">POLYMARKET / KALSHI</span><h2>{t('Every move, in context.')}</h2><p>{t('Market activity, verified comparisons, and the evidence behind them.')}</p></div><a className="primary button-link" href="#/markets">{t('Open market explorer')} <span aria-hidden="true">↗</span></a></section>
+    {overview.isPending && <p role="status">{t('Loading research coverage…')}</p>}
     {overview.error && <ErrorNotice error={overview.error} retry={() => void overview.refetch()} />}
-    {overview.data && <><div className="metric-grid overview-metrics">{[[overview.data.markets, t("Collected markets"), t('{count} open with recent observations', { count: overview.data.fresh_markets })], [overview.data.reviewed_pairs, t("Reviewed comparisons"), t("Explicit outcome and rule alignment")], [overview.data.evidence_items, t("News & evidence entries"), t("Versioned from first collection")]].map(([value, label, note]) => <section className="panel" key={label}><span>{label}</span><strong>{value}</strong><small>{note}</small></section>)}</div><p className="quiet">{t("Latest market observation:")} {time(overview.data.latest_observation)}{t(". All times use your local timezone.")}</p></>}
-    <div className="section-heading"><h2>{t("Reviewed comparisons")}</h2><a className="text-button" href="#/comparisons">{t("View all →")}</a></div>
-    {pairs.isPending && <p role="status">{t("Loading comparisons…")}</p>}
-    {pairs.error && <ErrorNotice error={pairs.error} retry={() => void pairs.refetch()} />}
-    {pairs.data && (pairs.data.length ? <div className="pair-grid">{pairs.data.slice(0, 2).map((r) => <PairCard key={r.id} review={r} />)}</div> : <Empty title={t("No reviewed pairs yet")}>{t("Comparisons appear after both markets have been collected and their settlement rules reviewed.")}</Empty>)}
-    <div className="research-columns"><section className="panel"><div className="section-heading"><h2>{t("Latest news & evidence")}</h2><a className="text-button" href="#/evidence">{t("All evidence →")}</a></div>
-      {news.isPending && <p role="status">{t("Loading announcements…")}</p>}{news.error && <ErrorNotice error={news.error} retry={() => void news.refetch()} />}
-      {news.data?.items.map((item) => <EvidenceCard key={item.id} item={item} compact />)}{news.data?.items.length === 0 && <p>{t("No announcements collected yet.")}</p>}
-    </section><section className="panel source-panel"><span className="eyebrow">{t("COLLECTION STATUS")}</span><h2>{t("Know your coverage")}</h2><p>{t("Official releases and selected media feeds. Publication dates can precede collection.")}</p>
-      {overview.data?.news_polling_enabled === false && <p className="data-warning">{t("News polling is paused.")}</p>}
-      {overview.data?.sources.map((source) => <article key={source.slug}><a href={source.url} target="_blank" rel="noopener noreferrer">{t(source.name)} ↗</a><SourceStatus source={source} /><small>{t("Last success:")} {time(source.last_success_at)}</small><small>{t("Last check:")} {time(source.last_checked_at)}</small>{source.error && <p className="error">{source.error}</p>}</article>)}
-      <p className="quiet">{t("REST market snapshots · History from collection · Versioned evidence")}</p>
-    </section></div>
-  </>
+    {overview.data && <div className="overview-stat-strip">{[[overview.data.markets, t('Collected markets'), '01', t('Polymarket + Kalshi · Selected coverage')], [overview.data.fresh_markets, t('Fresh open markets'), '02', t('Recent observations')], [overview.data.reviewed_pairs, t('Reviewed comparisons'), '03', t('Explicit outcome and rule alignment')], [overview.data.evidence_items, t('News & evidence entries'), '04', t('Versioned from first collection')]].map(([value, label, index, note]) => <section key={label}><div><span>{label}</span><span className="stat-index">{index}</span></div><strong>{Number(value).toLocaleString()}</strong><small>{note}</small></section>)}</div>}
+    <div className="overview-grid"><div className="overview-main"><OverviewMovers userId={userId} />
+      <section className="overview-comparisons"><div className="section-heading"><div><span className="eyebrow">{t('CROSS-PLATFORM')}</span><h2>{t('Reviewed comparisons')}</h2></div><a className="text-button" href="#/comparisons">{t('View all →')}</a></div>
+        {pairs.isPending && <p role="status">{t('Loading comparisons…')}</p>}{pairs.error && <ErrorNotice error={pairs.error} retry={() => void pairs.refetch()} />}
+        {pairs.data && (pairs.data.length ? <div className="pair-grid">{pairs.data.slice(0, 2).map(r => <PairCard key={r.id} review={r} />)}</div> : <Empty title={t('No reviewed pairs yet')}>{t('Comparisons appear after both markets have been collected and their settlement rules reviewed.')}</Empty>)}
+      </section>
+    </div><div className="overview-side"><section className="panel overview-news"><div className="section-heading"><div><span className="eyebrow">{t('INTELLIGENCE WIRE')}</span><h2>{t('Latest news & evidence')}</h2></div><a className="text-button" href="#/evidence" aria-label={t('All evidence →')}>↗</a></div>
+      {news.isPending && <p role="status">{t('Loading announcements…')}</p>}{news.error && <ErrorNotice error={news.error} retry={() => void news.refetch()} />}
+      {news.data?.items.map(item => <EvidenceCard key={item.id} item={item} compact />)}{news.data?.items.length === 0 && <p>{t('No announcements collected yet.')}</p>}
+    </section><section className="panel source-panel overview-sources"><div className="section-heading"><span className="eyebrow">{t('COLLECTION STATUS')}</span><span className="quiet">{t('Selected coverage')}</span></div>
+      {overview.data?.news_polling_enabled === false && <p className="data-warning">{t('News polling is paused.')}</p>}
+      {overview.data && <><div className="source-counts"><span><strong>{overview.data.sources.filter(s => s.status === 'healthy').length}</strong>{t('Healthy sources')}</span><span><strong className={overview.data.sources.some(s => s.status !== 'healthy' && s.status !== 'paused') ? 'paper-warning' : ''}>{overview.data.sources.filter(s => s.status !== 'healthy' && s.status !== 'paused').length}</strong>{t('Sources needing attention')}</span><span><strong>{overview.data.sources.filter(s => s.status === 'paused').length}</strong>{t('Paused sources')}</span></div><details className="source-disclosure"><summary>{t('Inspect all {count} sources', { count: overview.data.sources.length })}</summary><div className="source-detail-list" tabIndex={0} role="region" aria-label={t('News source coverage')}>
+      {overview.data.sources.map(source => <article key={source.slug}><div><a href={source.url} target="_blank" rel="noopener noreferrer">{t(source.name)} ↗</a><SourceStatus source={source} /></div><small>{t('Last success:')} {time(source.last_success_at)}</small>{source.error && <p className="error">{source.error}</p>}</article>)}
+      {!overview.data.sources.length && <p className="quiet">{t('No sources configured.')}</p>}</div></details></>}
+    </section></div></div>
+    <footer className="overview-footer"><span>{t('Latest market observation:')} {time(overview.data?.latest_observation)}</span><span>{t('All times use your local timezone.')}</span></footer>
+  </div>
 }
 
 export function ComparisonList({ userId, cutoff }: { userId: string; cutoff: string }) {

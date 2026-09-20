@@ -53,6 +53,11 @@ and execution data. Row count alone does not measure training readiness.
 
 ### Numerical sensitivity in cumulative volume
 
+Update (2026-09-20): the code now addresses this finding with the versioned
+[cumulative-volume precision policy](data-quality.md#cumulative-volume-precision-policy).
+The observations and counts below remain the original audit record; this note does
+not claim the updated code has been deployed or that the live dataset was re-audited.
+
 The five contracts flagged `volume_counter_reset` at the main snapshot each had
 one tiny downward change in the subsequent 20-minute inspection. For example:
 

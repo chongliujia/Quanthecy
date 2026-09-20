@@ -29,6 +29,15 @@ Contributions to collection reliability, data quality, research evidence, analyt
 
 Tests normally mock exchange and model requests. See the research guides for optional integration checks. 常规测试模拟交易所和模型请求，可选集成检查见研究指南。
 
+Run `make check` for the complete baseline and `make test-down` to remove its
+disposable services afterward. Python checks use the standalone `compose.test.yaml`
+project, including PostgreSQL and real ClickHouse integration tests, without loading
+the local `.env` or starting application workers. See [testing](docs/testing.md).
+
+完整检查使用 `make check`，结束后运行 `make test-down` 清理临时测试服务。Python
+测试使用独立数据库和网络，不加载本地 `.env`，不会启动采集器或 Agent 工作进程。
+详见[测试指南](docs/testing.md)。
+
 ## Review expectations / 评审要求
 
 Describe the problem, the final behavior, and relevant validation. Include operational steps when a change affects deployment. Do not commit credentials, local databases, or private account details in logs and screenshots.

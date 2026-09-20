@@ -127,6 +127,10 @@ def test_prompt_and_only_enabled_skills_reach_the_assigned_node():
     "patch",
     [
         {"prompt": "x" * 8001},
+        {"max_output_tokens": 255},
+        {"max_output_tokens": 65537},
+        {"max_output_tokens": 512.5},
+        {"max_output_tokens": True},
         {"skills": [{"name": "../SKILL.md", "content": "x"}]},
         {"skills": [{"name": "nested/SKILL.md", "content": "x"}]},
         {"skills": [{"name": "script.py", "content": "x"}]},
@@ -144,3 +148,27 @@ def test_custom_node_content_is_bounded_and_cannot_reference_upload_paths(patch)
 
     with pytest.raises(ValidationError):
         GraphNode.model_validate({"id": "quant", "kind": "quant", "label": "Quant", **patch})
+
+
+def test_optional_output_limit_preserves_legacy_hash_and_freezes_explicit_limits():
+    from quanthecy_analytics.assistant import AssistantGraph
+    from quanthecy_analytics.intelligence import digest
+
+    legacy = default_graph().model_dump(mode="json")
+    assert all("max_output_tokens" not in node for node in legacy["nodes"])
+    graph = AssistantGraph.model_validate(legacy)
+    graph.nodes[0].max_output_tokens = 512
+    assert graph.model_dump()["nodes"][0]["max_output_tokens"] == 512
+    assert digest(graph.model_dump()) != digest(legacy)
+    graph.nodes[0].max_output_tokens = None
+    assert digest(graph.model_dump()) == digest(legacy)
+
+
+def test_canvas_positions_can_cross_origin_without_changing_execution():
+    from quanthecy_analytics.assistant import AssistantGraph
+
+    graph = default_graph()
+    graph.nodes[0].x, graph.nodes[0].y = -600, -250
+    restored = AssistantGraph.model_validate(graph.model_dump())
+    assert restored.nodes[0].x == -600 and restored.nodes[0].y == -250
+    assert [n.id for n in compile_graph(restored)] == [n.id for n in compile_graph(default_graph())]

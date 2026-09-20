@@ -1,6 +1,7 @@
 import { t, locale, useLanguage } from './i18n'
 import { lazy, Suspense, useState, type FormEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { change as formatChange, changeTone } from './format'
 import { useCollectionStatus } from './collectionHealth'
 import { api, type Organization } from './api'
 import type { Market } from './marketTypes'
@@ -14,7 +15,7 @@ type TopicCoverage = {
 }
 
 function probability(value: number | null | undefined) { return value == null ? t("Unavailable") : `${(value * 100).toFixed(2)}%` }
-function change(value: number | null | undefined) { return value == null ? '—' : `${value > 0 ? '+' : ''}${(value * 100).toFixed(2)} pp` }
+function change(value: number | null | undefined) { return value == null ? '—' : formatChange(value) }
 function localTime(value: string) { return new Date(value).toLocaleString(locale()) }
 function ErrorNotice({ error, retry }: { error: Error; retry: () => void }) {
   return <div role="alert" className="error">{t(error.message)} <button onClick={retry}>{t("Retry")}</button></div>
@@ -72,7 +73,7 @@ export default function MarketExplorer({ userId, selectedId, onSelect, organizat
     {markets.data && <>
       <p className="quiet">{markets.data.total} {t("markets")}{sort !== 'recent' && t(" with fresh, comparable metrics")}</p>
       {markets.data.items.length === 0 ? <section className="panel"><h3>{t("No markets to show yet")}</h3><p>{collection.data?.sources?.some((source) => (!platform || source.platform === platform) && (source.state === 'delayed' || source.error_code)) ? t("Collection is interrupted or delayed. Rankings exclude stale observations. Check the source status above or switch to Recently observed to inspect saved history.") : t("No collected markets match these filters with enough recent history. Try another filter or inspect Recently observed markets.")}</p></section>
-        : <div className="panel table-scroll" tabIndex={0} role="region" aria-label={t("Collected markets")}><table className="market-table"><thead><tr><th>{t("Market · YES")}</th><th>{t("Midpoint")}</th><th>{t("15m change")}</th><th>{t("Last observed")}</th></tr></thead><tbody>{markets.data.items.map((m) => <tr key={m.id}><td><button className="market-link" onClick={() => setSelected(m.id)}>{m.title}</button><small>{m.platform} · {t(m.status)}{m.stale ? t(" · STALE") : ''}</small></td><td>{probability(m.probability)}</td><td>{change(m.metrics.probability_change_15m)}</td><td>{localTime(m.last_observed_at)}</td></tr>)}</tbody></table></div>}
+        : <div className="panel table-scroll" tabIndex={0} role="region" aria-label={t("Collected markets")}><table className="market-table"><thead><tr><th>{t("Market · YES")}</th><th>{t("Midpoint")}</th><th>{t("15m change")}</th><th>{t("Last observed")}</th></tr></thead><tbody>{markets.data.items.map((m) => <tr key={m.id}><td><button className="market-link" onClick={() => setSelected(m.id)}>{m.title}</button><small>{m.platform} · {t(m.status)}{m.stale ? t(" · STALE") : ''}</small></td><td className="numeric">{probability(m.probability)}</td><td className={`numeric ${changeTone(m.metrics.probability_change_15m, m.stale)}`}>{change(m.metrics.probability_change_15m)}</td><td>{localTime(m.last_observed_at)}</td></tr>)}</tbody></table></div>}
       <div className="pagination"><button disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - 20))}>{t("Previous")}</button><span>{markets.data.total ? offset + 1 : 0}–{Math.min(offset + 20, markets.data.total)} {t("of")} {markets.data.total}</span><button disabled={offset + 20 >= markets.data.total} onClick={() => setOffset(offset + 20)}>{t("Next")}</button></div>
     </>}
   </section>

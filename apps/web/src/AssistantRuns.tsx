@@ -32,6 +32,7 @@ export function AssistantRunDetail({ userId, organizationId, runId, writable }: 
     {run.report && <div className="paper-notice"><strong>{t(run.report.decision)}</strong> · {run.report.rationale.text}</div>}
     {!run.steps.length && <p>{t('Waiting for the worker to assemble frozen evidence.')}</p>}
     {run.steps.map((step, index) => <details className="assistant-step" key={step.id} open={step.state === 'RUNNING' || step.state === 'FAILED'}><summary><span>{index + 1}. {t(step.name)}</span><span>{t(step.state)} {step.finished_at && `· ${((Date.parse(step.finished_at) - Date.parse(step.started_at)) / 1000).toFixed(1)} s`}</span></summary><StepOutput step={step} />
+      {step.model_settings && <p className="quiet">{step.model_settings.model} · {t('Effective output token limit')}: {step.model_settings.max_output_tokens.toLocaleString()} · {t('Model configuration revision')}: {step.model_settings.configuration_revision}</p>}
       {step.error_code && <p role="alert">{runError(step.error_code)}</p>}
       {step.validation_errors?.map((e, i) => <p key={i}>{e.field}: {e.code}</p>)}
       <p className="quiet">{t('Input / output tokens reported')}: {step.usage.prompt_tokens ?? 0} / {step.usage.completion_tokens ?? 0}</p>

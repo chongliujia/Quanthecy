@@ -3,12 +3,14 @@ from uuid import UUID
 from django.http import HttpRequest
 from ninja import Router
 
+from quanthecy.organizations.policies import require_org_member
 from quanthecy.paper import services, views
 from quanthecy.paper.schemas import (
     CandidateOut,
     CreateInput,
     LabOut,
     OrderDetail,
+    PolicyOut,
     ReviewDetail,
     RunningInput,
     UpgradeInput,
@@ -17,6 +19,12 @@ from quanthecy.paper.schemas import (
 from .auth import current_user
 
 router = Router(tags=["Paper trading"])
+
+
+@router.get("/{organization_id}/paper/policy", response=PolicyOut)
+def policy(request: HttpRequest, organization_id: UUID) -> PolicyOut:
+    require_org_member(current_user(request), organization_id)
+    return PolicyOut.model_validate(services.POLICY)
 
 
 @router.get("/{organization_id}/paper/candidates", response=list[CandidateOut])

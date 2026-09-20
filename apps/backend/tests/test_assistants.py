@@ -366,3 +366,86 @@ def test_prompt_skills_saved_by_api_are_frozen_and_used_in_langgraph(assistant_s
         content_type="application/json",
     )
     assert invalid.status_code == 422
+
+
+@pytest.mark.parametrize("paper,workspace_limit", [(False, 4096), (True, 4096), (True, 1000)])
+def test_node_output_budget_is_frozen_capped_and_audited(assistant_setup, paper, workspace_limit):
+    from quanthecy.agents.models import ModelConfiguration
+
+    user, org, market, old, assistant, _ = assistant_setup
+    configure(org)
+    ModelConfiguration.objects.filter(organization=org).update(max_output_tokens=workspace_limit)
+    graph = AssistantGraph.model_validate(assistant.draft)
+    graph.nodes[0].max_output_tokens = 512
+    graph.nodes[1].max_output_tokens = 8192
+    assistant = assistants.save(
+        user, org.id, assistant.id, AssistantSave(name=assistant.name, revision=1, graph=graph)
+    )
+    version = assistants.publish(user, org.id, assistant.id, 2)
+    if paper:
+        experiment = comparison((user, org, market, old, assistant, version))
+        cycle(experiment, market, BASE)
+        op = Opportunity.objects.get(account__assistant_version=version)
+        assert schedule(op)
+        op.refresh_from_db()
+        run = op.review_run
+    else:
+        with (
+            patch("quanthecy.agents.services.timezone.now", return_value=BASE),
+            patch("quanthecy.agents.services.endpoint", return_value="http://127.0.0.1:8088/v1"),
+        ):
+            run = assistants.trial(user, org.id, assistant.id, 2, market.id, uuid4())
+    graph.nodes[0].max_output_tokens = 1024
+    assistants.save(
+        user, org.id, assistant.id, AssistantSave(name=assistant.name, revision=2, graph=graph)
+    )
+    sent = []
+
+    def capture(connection, system, prompt, stopped):
+        sent.append(connection.max_output_tokens)
+        return provider(connection, system, prompt, stopped)
+
+    run_worker(capture)
+    run.refresh_from_db()
+    assert run.state == "SUCCEEDED", run.error_code
+    ceiling = min(workspace_limit, 2048) if paper else workspace_limit
+    assert sorted(sent) == sorted([512, ceiling, ceiling, ceiling, ceiling])
+    assert (
+        next(step for step in run.steps if step["id"] == "quant")["model_settings"][
+            "max_output_tokens"
+        ]
+        == 512
+    )
+    client = Client()
+    client.force_login(user)
+    detail = client.get(f"/api/v1/organizations/{org.id}/agent/runs/{run.id}").json()
+    assert all(s["model_settings"]["model"] == run.model for s in detail["steps"])
+    assert [s["model_settings"]["max_output_tokens"] for s in detail["steps"]] == sent
+    assert (
+        client.get(f"/api/v1/organizations/{org.id}/agent/status").json()["max_output_tokens"]
+        == workspace_limit
+    )
+
+
+def test_execution_policy_requires_workspace_membership_and_has_no_side_effects(assistant_setup):
+    from quanthecy.agents.models import Assistant, ModelConfiguration
+    from quanthecy.paper.models import Experiment
+    from quanthecy.paper.services import POLICY
+
+    user, org, _, _, _, _ = assistant_setup
+    other = create_organization(owner=user, name="Other workspace")
+    OrganizationMembership.objects.filter(user=user, organization=org).update(role="VIEWER")
+    client = Client()
+    client.force_login(user)
+    before = [
+        model.objects.count() for model in (Assistant, AgentRun, Experiment, ModelConfiguration)
+    ]
+    result = client.get(f"/api/v1/organizations/{org.id}/paper/policy")
+    assert result.status_code == 200
+    assert result.json()["market_budget_fraction"] == POLICY["market_budget_fraction"]
+    assert [
+        model.objects.count() for model in (Assistant, AgentRun, Experiment, ModelConfiguration)
+    ] == before
+    OrganizationMembership.objects.filter(user=user, organization=other).delete()
+    assert client.get(f"/api/v1/organizations/{other.id}/paper/policy").status_code == 404
+    assert client.get(f"/api/v1/organizations/{other.id}/agent/status").status_code == 404

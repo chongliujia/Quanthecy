@@ -44,7 +44,8 @@ it('preserves unknown probabilities and stale status through detail navigation',
   })
   mount()
   fireEvent.click(await screen.findByRole('button', { name: 'A research question?' }))
-  expect(await screen.findByText(/Collection is stale/)).toBeInTheDocument()
+  // The first navigation also loads the terminal's lazy module on a cold build.
+  expect(await screen.findByText(/Collection is stale/, {}, { timeout: 5000 })).toBeInTheDocument()
   expect(screen.getByText(/Analytics pending: insufficient history/)).toBeInTheDocument()
   expect(await screen.findByText(/No observations in this window/)).toBeInTheDocument()
   expect(screen.queryByText('0.00%')).not.toBeInTheDocument()

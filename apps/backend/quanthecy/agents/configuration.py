@@ -12,8 +12,8 @@ from quanthecy.organizations.models import Organization
 from quanthecy.organizations.policies import require_org_role
 
 from .catalog import DEFAULT_ENDPOINTS
-from .models import AgentRun, ModelConfiguration
-from .schemas import ConfigurationInput, ConfigurationOut
+from .models import AgentRun, ModelConfiguration, ModelConnection
+from .schemas import ConfigurationInput, ConfigurationOut, ConnectionOut
 
 
 def cipher() -> Fernet:
@@ -94,6 +94,21 @@ def configuration_value(config: ModelConfiguration) -> ConfigurationOut:
         context_window_tokens=config.context_window_tokens,
         enable_thinking=config.enable_thinking,
         allowed_endpoints=settings.AGENT_ALLOWED_ENDPOINTS,
+        connections=[
+            ConnectionOut(
+                id=connection.id,
+                provider=connection.provider,
+                base_url=connection.base_url,
+                model=connection.model,
+                has_api_key=bool(connection.encrypted_api_key),
+                max_output_tokens=connection.max_output_tokens,
+                context_window_tokens=connection.context_window_tokens,
+                enable_thinking=connection.enable_thinking,
+            )
+            for connection in ModelConnection.objects.filter(
+                organization_id=config.organization_id
+            ).order_by("-updated_at", "id")
+        ],
     )
 
 
@@ -101,6 +116,23 @@ def get_configuration(actor: User, organization_id: UUID) -> ConfigurationOut:
     require_org_role(actor, organization_id, {"OWNER"})
     config = ModelConfiguration.objects.filter(organization_id=organization_id).first()
     return configuration_value(config or ModelConfiguration(organization_id=organization_id))
+
+
+def remember_connection(config: ModelConfiguration) -> None:
+    if not config.revision:
+        return
+    ModelConnection.objects.update_or_create(
+        organization_id=config.organization_id,
+        provider=config.provider,
+        base_url=config.base_url.rstrip("/"),
+        defaults={
+            "model": config.model,
+            "encrypted_api_key": config.encrypted_api_key,
+            "max_output_tokens": config.max_output_tokens,
+            "context_window_tokens": config.context_window_tokens,
+            "enable_thinking": config.enable_thinking,
+        },
+    )
 
 
 @transaction.atomic
@@ -120,12 +152,13 @@ def save_configuration(
         raise ValidationError("Invalid API key format.")
     if secret and payload.clear_api_key:
         raise ValidationError("Choose either replacing or removing the API key.")
-    if (
-        target != config.base_url
-        and config.encrypted_api_key
-        and not (secret or payload.clear_api_key)
-    ):
-        raise ValidationError("Replace or remove the saved API key when changing its endpoint.")
+    remember_connection(config)
+    # Select only the target connection's key, never the previous endpoint's.
+    if (payload.provider, target) != (config.provider, config.base_url.rstrip("/")):
+        destination = ModelConnection.objects.filter(
+            organization_id=organization_id, provider=payload.provider, base_url=target
+        ).first()
+        config.encrypted_api_key = destination.encrypted_api_key if destination else ""
     if secret:
         config.encrypted_api_key = cipher().encrypt(secret.encode()).decode()
     elif payload.clear_api_key:
@@ -150,6 +183,7 @@ def save_configuration(
     config.revision += 1
     config.updated_by = actor
     config.save()
+    remember_connection(config)
     AgentRun.objects.filter(
         organization_id=organization_id, state__in=["PENDING", "RUNNING"]
     ).update(

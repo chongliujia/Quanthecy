@@ -62,12 +62,13 @@ it('rechecks encryption availability without losing the model draft', async () =
   expect(screen.getByLabelText('Model ID')).toHaveValue('draft-model')
 })
 
-it('changes protocol and requires an explicit replacement for the old credential', async () => {
+it('changes protocol without offering the previous connection key to the new provider', async () => {
   const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => new Response(JSON.stringify(String(input).endsWith('/csrf') ? { csrf_token: 'csrf' } : init?.method === 'PUT' ? { ...configuration, revision: 1 } : { ...configuration, has_api_key: true, allowed_endpoints: [...configuration.allowed_endpoints, 'https://api.anthropic.com/v1'] })))
   mount()
   fireEvent.change(await screen.findByLabelText('Model provider'), { target: { value: 'anthropic' } })
   expect(screen.getByLabelText('API base URL')).toHaveValue('https://api.anthropic.com/v1')
-  expect(screen.getByRole('button', { name: 'Save configuration' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Save configuration' })).toBeEnabled()
+  expect(screen.queryByLabelText('Remove saved API key')).not.toBeInTheDocument()
   fireEvent.change(screen.getByLabelText(/^API key/), { target: { value: 'new-provider-test-key' } })
   fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }))
   await screen.findByText('Configuration saved. No model request was made.')
@@ -108,12 +109,41 @@ it('blocks an output budget that consumes the entire local context window', asyn
   expect(screen.getByRole('button', { name: 'Save configuration' })).toBeDisabled()
 })
 
-it('keeps a cloud credential at its original endpoint until explicitly removed for local use', async () => {
+it('allows a keyless local connection without asking to delete the cloud credential', async () => {
   vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ...configuration, has_api_key: true, allowed_endpoints: [...configuration.allowed_endpoints, 'http://127.0.0.1:8001/v1'] })))
   mount()
   fireEvent.change(await screen.findByLabelText('Model provider'), { target: { value: 'local' } })
   fireEvent.change(screen.getByLabelText('Model ID'), { target: { value: 'offline-model' } })
-  expect(screen.getByRole('button', { name: 'Save configuration' })).toBeDisabled()
-  fireEvent.click(screen.getByLabelText('Remove saved API key'))
   expect(screen.getByRole('button', { name: 'Save configuration' })).toBeEnabled()
+  expect(screen.queryByLabelText('Remove saved API key')).not.toBeInTheDocument()
+})
+
+it('restores a saved cloud connection after local use without requesting its key again', async () => {
+  const cloud = { id: 'cloud1', provider: 'openai_compatible', base_url: 'https://api.deepseek.com', model: 'saved-cloud-model', has_api_key: true, max_output_tokens: 32768, context_window_tokens: null, enable_thinking: false }
+  const local = { id: 'local1', provider: 'local', base_url: 'http://127.0.0.1:8001/v1', model: 'offline-model', has_api_key: false, max_output_tokens: 1024, context_window_tokens: 8192, enable_thinking: false }
+  const initial = { ...configuration, ...local, enabled: true, revision: 2, allowed_endpoints: [cloud.base_url, local.base_url], connections: [local, cloud] }
+  const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => new Response(JSON.stringify(String(input).endsWith('/csrf') ? { csrf_token: 'csrf' } : init?.method === 'PUT' ? { ...initial, ...cloud, revision: 3 } : initial)))
+  mount()
+  fireEvent.change(await screen.findByLabelText('Saved connections'), { target: { value: 'cloud1' } })
+  expect(screen.getByLabelText('Model ID')).toHaveValue('saved-cloud-model')
+  expect(screen.getByLabelText('Maximum output tokens')).toHaveValue(32768)
+  expect(screen.getByLabelText(/^API key/)).toHaveValue('')
+  expect(screen.getByPlaceholderText('Leave blank to keep the saved key')).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Save configuration' })).toBeEnabled()
+  fireEvent.click(screen.getByRole('button', { name: 'Save configuration' }))
+  await screen.findByText('Configuration saved. No model request was made.')
+  const sent = JSON.parse(String(fetch.mock.calls.find(([, init]) => init?.method === 'PUT')?.[1]?.body))
+  expect(sent).toMatchObject({ revision: 2, base_url: cloud.base_url, model: cloud.model, clear_api_key: false })
+  expect(sent.api_key).toBeUndefined()
+  expect(fetch.mock.calls.some(([url]) => String(url).endsWith('/test'))).toBe(false)
+})
+
+it('restores the current cloud settings when switching back before saving local changes', async () => {
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({ ...configuration, provider: 'openai', base_url: 'https://api.openai.com/v1', model: 'saved-model', has_api_key: true, max_output_tokens: 32768, allowed_endpoints: ['https://api.openai.com/v1', 'http://127.0.0.1:8001/v1'] })))
+  mount()
+  fireEvent.change(await screen.findByLabelText('Model provider'), { target: { value: 'local' } })
+  fireEvent.change(screen.getByLabelText('Model provider'), { target: { value: 'openai' } })
+  expect(screen.getByLabelText('Model ID')).toHaveValue('saved-model')
+  expect(screen.getByLabelText('Maximum output tokens')).toHaveValue(32768)
+  expect(screen.getByPlaceholderText('Leave blank to keep the saved key')).toBeVisible()
 })

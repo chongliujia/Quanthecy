@@ -1,6 +1,6 @@
 # Research data quality
 
-The `research-quality-v1` policy distinguishes **price-change eligibility** from
+The `research-quality-v2` policy distinguishes **price-change eligibility** from
 **volume-anomaly eligibility**. A market can have both, one, or neither available.
 These labels describe the sampled data, not forecast accuracy, representativeness,
 liquidity, or a trading opportunity. Collection health alone is not eligibility.
@@ -23,6 +23,7 @@ liquidity, or a trading opportunity. Collection health alone is not eligibility.
 - Volume research requires nonnegative cumulative values with stable units/basis,
   valid as-of times and no counter reset. Constant baseline activity has no defined
   Z score: volume anomaly is unavailable, while valid price changes remain usable.
+  Precision-scale changes use the shared numerical policy below.
 - Recording time cannot precede receipt. Current eligibility rejects future data
   and observations or indicator as-of times older than 180 seconds at the requested
   research cutoff. Stored historical signals remain historical records.
@@ -57,8 +58,9 @@ Closed or stale history remains available for inspection and reproduction.
 
 ## Versioning and rollout
 
-New signals use `rest-window-v2`, preserving thresholds but adding semantic checks.
-Their IDs differ from v1; existing records are not overwritten. Metrics without the
+New signals use `rest-window-v3`, preserving research thresholds and applying the
+same cumulative-volume tolerance to reset detection and rate calculations.
+Their IDs differ from v1/v2; existing records are not overwritten. Metrics without the
 current quality policy are marked pending until a new worker observation evaluates
 them. Historical signal inputs can be reproduced with the recorded version:
 
@@ -68,10 +70,45 @@ from quanthecy_analytics.signals import replay
 metrics, signals = replay(saved_signal["version"], exported_observations)
 ```
 
-`signals_v1.py` is frozen for existing v1 records. Unsupported versions fail explicitly.
+`signals_v1.py` is frozen for existing v1 records. `signals_v2.py` and its independent
+`quality_v1.py` preserve v2 behavior, including its strict counter-reset rule.
+Unsupported versions fail explicitly.
 Normal quality tests use synthetic fixtures and mocked providers, with no paid calls.
 
-This first policy does not add automatic history backfill, tick-complete collection,
+Updating the backend and analytics worker together keeps current quality gates in
+sync. Other Python workers share those gates and should use the same image. Existing
+metrics with the old policy remain ineligible until processed under v2; this change
+does not rewrite stored observations, historical signals, reports or paper decisions.
+No database migration or historical backfill is required.
+
+## Cumulative-volume precision policy
+
+For each adjacent pair of finite, nonnegative counters in the same units/basis:
+
+```text
+tolerance = max(1e-9, 8 * max(ulp(previous), ulp(current)))
+delta = 0 if abs(current - previous) <= tolerance else current - previous
+```
+
+`ulp` is the spacing between adjacent binary64 values at the counter's magnitude.
+Eight steps cover the four-step serialization discrepancy recorded in the
+[September audit](data-quality-audit-2026-09-18.md). The absolute floor is in the
+reported source units. This is a numerical policy, not a percentage-based allowance
+for declining economic volume. Both constants are saved in v3 signal parameters.
+
+Reset detection and interval rates call the same function. Both positive and
+negative changes inside tolerance become zero, preventing rounding jitter from
+creating a spurious activity baseline. Larger decreases still block volume
+analysis; units/basis changes, missing/nonfinite values, and constant baselines
+remain unavailable. A reset smaller than the numerical tolerance cannot be
+distinguished from precision noise. Each comparison is local to an adjacent pair;
+this does not repair counters or infer missing activity.
+
+For example, `48732713.555604056 → 48732713.55560403` contributes zero activity;
+a decline of `0.01` at the same scale still produces `volume_counter_reset`.
+Original counter values and exported envelopes remain unchanged.
+
+This policy does not add automatic history backfill, tick-complete collection,
 external source verification, a quarantine queue, or topic-based market selection.
 Those require separate ingestion and operations work; no claim of complete or
 error-free exchange data is made.

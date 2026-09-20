@@ -48,6 +48,10 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 [tool.ruff.lint.per-file-ignores]
 "**/migrations/*.py" = ["E501"]
 
+[tool.ruff.format]
+# Keep released, Django-generated migrations unchanged; lint and drift checks still apply.
+exclude = ["**/migrations/*.py"]
+
 [tool.mypy]
 python_version = "3.12"
 plugins = ["mypy_django_plugin.main"]

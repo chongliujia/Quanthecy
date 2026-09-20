@@ -1,0 +1,58 @@
+{
+  "captured_at": "2026-09-20T11:54:39.187Z",
+  "viewport": {
+    "width": 1920,
+    "height": 1200
+  },
+  "source": "Current local frontend at http://127.0.0.1:3000; isolated browser, intercepted demonstration API responses. No real account, model call, or experiment.",
+  "images": [
+    {
+      "file": "en/paper-lab.png",
+      "width": 1920,
+      "height": 1200,
+      "bytes": 145695
+    },
+    {
+      "file": "en/assistant-workflow.png",
+      "width": 1920,
+      "height": 1200,
+      "bytes": 168595
+    },
+    {
+      "file": "en/team-configuration.png",
+      "width": 1920,
+      "height": 1488,
+      "bytes": 219613
+    },
+    {
+      "file": "en/model-connections.png",
+      "width": 1920,
+      "height": 1200,
+      "bytes": 151651
+    },
+    {
+      "file": "zh-CN/paper-lab.png",
+      "width": 1920,
+      "height": 1200,
+      "bytes": 146646
+    },
+    {
+      "file": "zh-CN/assistant-workflow.png",
+      "width": 1920,
+      "height": 1200,
+      "bytes": 173313
+    },
+    {
+      "file": "zh-CN/team-configuration.png",
+      "width": 1920,
+      "height": 1488,
+      "bytes": 242049
+    },
+    {
+      "file": "zh-CN/model-connections.png",
+      "width": 1920,
+      "height": 1200,
+      "bytes": 153336
+    }
+  ]
+}

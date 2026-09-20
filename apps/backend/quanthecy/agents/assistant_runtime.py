@@ -2,7 +2,7 @@
 
 import json
 from collections.abc import Callable
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import timedelta
 from threading import Event
 from typing import Any, cast
@@ -67,6 +67,11 @@ def execute(
             if stopped.is_set() or not live_run(run).exists():
                 raise PermissionDenied("Run cancelled")
             connection = connection_for(run)
+            if node.max_output_tokens is not None:
+                connection = replace(
+                    connection,
+                    max_output_tokens=min(connection.max_output_tokens, node.max_output_tokens),
+                )
             packet = node_input(state["context"], graph, node, state["outputs"])
             system = node_instructions(graph, node, cast(Language, run.language))
             skill = node_skill(graph, node)
@@ -80,6 +85,12 @@ def execute(
                 "finished_at": None,
                 "output": None,
                 "usage": {},
+                "model_settings": {
+                    "provider": connection.provider,
+                    "model": connection.model,
+                    "configuration_revision": run.configuration_revision,
+                    "max_output_tokens": connection.max_output_tokens,
+                },
                 "error_code": "",
                 "validation_errors": [],
                 "format_adjustments": [],

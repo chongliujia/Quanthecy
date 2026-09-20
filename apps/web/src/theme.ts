@@ -7,10 +7,11 @@ const media = window.matchMedia('(prefers-color-scheme: dark)')
 const listeners = new Set<() => void>()
 
 function preference(value: string | null): ThemePreference {
+  if (value === null) return 'dark'
   return value === 'light' || value === 'dark' ? value : 'system'
 }
 function savedPreference(): ThemePreference {
-  try { return preference(localStorage.getItem(storageKey)) } catch { return 'system' }
+  try { return preference(localStorage.getItem(storageKey)) } catch { return 'dark' }
 }
 function resolve(value: ThemePreference): Theme {
   return value === 'system' ? media.matches ? 'dark' : 'light' : value
@@ -21,7 +22,7 @@ state.theme = resolve(state.preference)
 function apply() {
   document.documentElement.dataset.theme = state.theme
   document.documentElement.style.colorScheme = state.theme
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', state.theme === 'dark' ? '#0b1018' : '#f4f7fb')
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', state.theme === 'dark' ? '#101318' : '#f4f6f8')
 }
 function update(value: ThemePreference) {
   const theme = resolve(value)

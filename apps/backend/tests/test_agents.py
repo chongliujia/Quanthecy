@@ -346,8 +346,10 @@ def test_endpoint_changes_cannot_silently_forward_saved_credentials(
 ):
     values = payload()
     values.update(revision=1, base_url="https://api.openai.com/v1")
-    with pytest.raises(ValidationError, match="Replace or remove"):
-        save_configuration(actor, organization.id, ConfigurationInput(**values))
+    saved = save_configuration(actor, organization.id, ConfigurationInput(**values))
+    assert not saved.has_api_key
+    assert next(c for c in saved.connections if c.base_url == configured.base_url).has_api_key
+    values["revision"] = saved.revision
     for target in [
         "http://169.254.169.254/v1",
         "https://model.example/v1?token=x",
@@ -360,6 +362,94 @@ def test_endpoint_changes_cannot_silently_forward_saved_credentials(
     values.update(base_url="https://api.openai.com/v1", clear_api_key=True)
     saved = save_configuration(actor, organization.id, ConfigurationInput(**values))
     assert not saved.has_api_key
+
+
+def test_saved_connections_restore_cloud_after_local_without_copying_keys(
+    actor, organization, configured, settings, client
+):
+    from quanthecy.agents.models import ModelConnection
+
+    settings.AGENT_ALLOWED_ENDPOINTS += ["http://127.0.0.1:8001/v1"]
+    cloud_ciphertext = configured.encrypted_api_key
+    local = local_payload()
+    local.update(revision=1, max_output_tokens=1024)
+    saved = save_configuration(actor, organization.id, ConfigurationInput(**local))
+    assert not saved.has_api_key and saved.model == "local-test"
+    stored_cloud = ModelConnection.objects.get(
+        organization=organization, base_url="https://model.example/v1"
+    )
+    assert stored_cloud.encrypted_api_key == cloud_ciphertext
+    assert stored_cloud.max_output_tokens == 2000
+    cloud = payload()
+    cloud.update(revision=saved.revision, enabled=True)
+    restored = save_configuration(actor, organization.id, ConfigurationInput(**cloud))
+    assert restored.has_api_key
+    configured.refresh_from_db()
+    assert decrypt_key(configured) == "secret-for-testing-only"
+    protocol_change = payload()
+    protocol_change.update(revision=restored.revision, provider="local", context_window_tokens=8192)
+    changed = save_configuration(actor, organization.id, ConfigurationInput(**protocol_change))
+    assert not changed.has_api_key
+    result = client.get(f"/api/v1/organizations/{organization.id}/agent/configuration")
+    assert result.status_code == 200 and len(result.json()["connections"]) == 3
+    assert cloud_ciphertext not in result.content.decode()
+    assert "secret-for-testing-only" not in result.content.decode()
+    assert "encrypted_api_key" not in result.content.decode()
+
+
+def test_clearing_target_connection_does_not_delete_other_saved_keys(
+    actor, organization, configured, settings
+):
+    from quanthecy.agents.models import ModelConnection
+
+    settings.AGENT_ALLOWED_ENDPOINTS += ["http://127.0.0.1:8001/v1"]
+    local = local_payload(api_key="local-test-key")
+    local["revision"] = 1
+    saved = save_configuration(actor, organization.id, ConfigurationInput(**local))
+    local.pop("api_key")
+    local.update(revision=saved.revision, clear_api_key=True)
+    save_configuration(actor, organization.id, ConfigurationInput(**local))
+    cloud = ModelConnection.objects.get(organization=organization, base_url=configured.base_url)
+    assert cloud.encrypted_api_key == configured.encrypted_api_key
+    assert not ModelConnection.objects.get(
+        organization=organization, provider="local"
+    ).encrypted_api_key
+
+
+def test_saved_connection_keys_never_cross_tenants_or_leak_to_members(
+    actor, organization, configured, client
+):
+    other = create_organization(owner=actor, name="Other connection desk")
+    other_config = save_configuration(actor, other.id, ConfigurationInput(**payload()))
+    assert not other_config.has_api_key
+    assert all(not connection.has_api_key for connection in other_config.connections)
+    OrganizationMembership.objects.filter(user=actor, organization=organization).update(
+        role="MEMBER"
+    )
+    assert (
+        client.get(f"/api/v1/organizations/{organization.id}/agent/configuration").status_code
+        == 403
+    )
+
+
+def test_connection_seed_migration_preserves_ciphertext_and_configuration(configured):
+    import importlib
+    from types import SimpleNamespace
+
+    from django.apps import apps
+    from django.db import connection
+    from quanthecy.agents.models import ModelConnection
+
+    ModelConnection.objects.all().delete()
+    seed = importlib.import_module("quanthecy.agents.migrations.0007_saved_model_connections")
+    seed.preserve_current_connections(apps, SimpleNamespace(connection=connection))
+    saved = ModelConnection.objects.get(organization_id=configured.organization_id)
+    assert saved.encrypted_api_key == configured.encrypted_api_key
+    assert (
+        saved.model == configured.model and saved.max_output_tokens == configured.max_output_tokens
+    )
+    configured.refresh_from_db()
+    assert configured.revision == 1 and configured.enabled
 
 
 def test_tenant_roles_csrf_and_disabled_default(client, actor, organization, market):

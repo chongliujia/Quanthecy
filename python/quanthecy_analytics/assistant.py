@@ -43,9 +43,10 @@ class GraphNode(BaseModel):
     label: str = Field(min_length=1, max_length=80)
     instructions: str = Field(default="", max_length=2000)
     prompt: str = Field(default="", max_length=8000)
+    max_output_tokens: int | None = Field(default=None, ge=256, le=65536, strict=True)
     skills: list[NodeSkillFile] = Field(default_factory=list, max_length=5)
-    x: float = Field(default=0, ge=0, le=2000, allow_inf_nan=False)
-    y: float = Field(default=0, ge=0, le=2000, allow_inf_nan=False)
+    x: float = Field(default=0, ge=-100000, le=100000, allow_inf_nan=False)
+    y: float = Field(default=0, ge=-100000, le=100000, allow_inf_nan=False)
 
     @model_validator(mode="after")
     def validate_customization(self) -> "GraphNode":
@@ -66,6 +67,8 @@ class GraphNode(BaseModel):
             data.pop("prompt", None)
         if not self.skills:
             data.pop("skills", None)
+        if self.max_output_tokens is None:
+            data.pop("max_output_tokens", None)
         return data
 
 

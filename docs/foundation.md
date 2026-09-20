@@ -91,6 +91,10 @@ Never run concurrent migration deployments. Named volumes survive `compose down`
 
 ## Optional host development
 
+For the container-based baseline, use `make check` followed by `make test-down`;
+see [testing](testing.md). It uses isolated databases and requires no host language
+toolchains. The commands below are optional for developers maintaining host tools.
+
 Install Python 3.12, uv, Node 22, and Rust 1.91.1 if using host tools. Configure
 PostgreSQL connection variables for a development database before integration
 tests; do not point tests at a production database.

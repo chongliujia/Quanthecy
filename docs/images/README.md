@@ -2,6 +2,26 @@
 
 [English README](../../README.md) · [中文 README](../../README.zh-CN.md)
 
+## Current interface · 2026-09-20 / 当前界面
+
+Eight new original browser captures show the current dark terminal interface in both languages. They were captured from the local frontend in an isolated headless Chrome context with intercepted **demonstration API data**. The visible workspace is named “Demo workspace” / “演示工作区”. No private session, real credential, paid model request, or live experiment was used.
+
+新增 8 张中英文浏览器原图，展示当前深色终端界面。截图来自本地前端和独立 Chrome 上下文，接口使用**演示数据**；工作区名称明确标为演示。没有使用私人登录会话、真实密钥、付费模型请求或真实实验。
+
+| Surface / 功能 | English | 简体中文 |
+| --- | --- | --- |
+| Assistant workflow / 多 Agent 工作流 | [Image](2026-09-20/en/assistant-workflow.png) | [图片](2026-09-20/zh-CN/assistant-workflow.png) |
+| Team configuration / 团队配置与风控 | [Image](2026-09-20/en/team-configuration.png) | [图片](2026-09-20/zh-CN/team-configuration.png) |
+| Paper lab / 模拟交易实验室 | [Image](2026-09-20/en/paper-lab.png) | [图片](2026-09-20/zh-CN/paper-lab.png) |
+| Model connections / 模型连接 | [Image](2026-09-20/en/model-connections.png) | [图片](2026-09-20/zh-CN/model-connections.png) |
+
+- Browser viewport: **1920 × 1200**, device scale 1, Asia/Shanghai timezone. Configuration captures include the full page to show the risk policy; other captures show the viewport. No post-capture image alterations. 浏览器视口为 **1920 × 1200**，设备缩放为 1，北京时区；配置总览为完整页面截图，其余为视口截图，未后期修改。
+- The five-node workflow is an unexecuted demo draft. The model name and “key saved” status are fixture values, not evidence of a successful provider connection. 五节点流程是未运行的演示草稿；模型名与「密钥已保存」状态来自演示接口，不表示已成功连接服务商。
+- Paper accounts have 10,000 initial virtual capital, no fills, and zero P&L; their flat equity lines overlap. These are UI examples, not performance results. 模拟账户初始虚拟本金为 10,000，没有成交、盈亏为零，净值线重合；仅展示界面，不代表策略表现。
+- Capture metadata: [manifest.json](2026-09-20/manifest.json). 拍摄时间与文件清单见同一元数据文件。
+
+## Collected-data archive · 2026-09-17 / 实际采集数据存档
+
 These **16 desktop screenshots** were supplied by the project maintainer on **2026-09-17 (Asia/Shanghai)**. Each original PNG is **3010 × 1640** pixels. They are copied without resizing, cropping, recoloring, or altering the interface. English and Chinese captures are stored separately with matching filenames.
 
 以下 **16 张电脑端截图**由项目维护者于 **2026-09-17（北京时间）**提供，每张原始 PNG 均为 **3010 × 1640** 像素。图片直接复制，未缩放、裁剪、改色或修改界面内容。中英文分目录保存，使用对应文件名。

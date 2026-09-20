@@ -312,8 +312,7 @@ def test_paper_execution_quotes_are_deduplicated_and_cannot_see_future_data(repo
         )
         repository.execute(
             "INSERT INTO execution_quotes SETTINGS date_time_input_format='best_effort' "
-            "FORMAT JSONEachRow\n"
-            + json.dumps(row)
+            "FORMAT JSONEachRow\n" + json.dumps(row)
         )
 
     insert(q)

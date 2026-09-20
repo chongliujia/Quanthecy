@@ -174,8 +174,10 @@ secret store, then recreate backend and agent-worker. Keep the key stable and ba
 it up separately from the database. Rotating or losing it requires re-entering
 workspace provider keys; an automatic key-rotation workflow is not implemented.
 Provider keys are encrypted using Fernet, never returned by the API, never stored
-in browser storage, and not logged. Changing the endpoint requires replacing or
-removing its saved credential so it cannot silently be forwarded elsewhere.
+in browser storage, and not logged. Saved connection profiles isolate credentials by organization,
+protocol, and normalized full API base URL. Switching restores only the selected
+connection’s credential; a new endpoint never inherits a key from another one.
+See [connection profiles and node configuration](agent-configuration.md).
 
 `AGENT_ALLOWED_ENDPOINTS` is an exact comma-separated allowlist of trusted API base
 URLs. Leaving it empty enables the public endpoints in
@@ -200,8 +202,10 @@ model or account was tested against a live provider.
 Choose **Local / offline model** in Model settings, enter the model server's base
 URL (including `/v1`) and exact served model ID. No API key is required for a server
 without authentication. A placeholder such as `EMPTY` can be saved if needed;
-nonempty keys use the same encrypted storage as other connections. Moving from a
-cloud endpoint still requires explicitly replacing or removing its saved key.
+nonempty keys use the same encrypted storage as other connections. Switching from a
+cloud endpoint preserves its saved connection and encrypted key. Select it again
+under **Saved connections** and save to restore it; local and cloud credentials
+remain separate.
 
 Local requests go directly to `POST {base_url}/chat/completions`, ignoring ambient
 proxy variables and refusing redirects. They use `max_tokens`, `temperature: 0.7`,
@@ -251,9 +255,10 @@ override accordingly. The model service remains bound to the host; the browser
 never contacts it directly. Market/news ingestion continues using its own network
 configuration. "Offline" describes model inference, not exchange data collection.
 
-Changing providers requires a replacement credential or explicit removal; the UI
-does not silently delete the saved key. Cloud presets cannot be enabled without a
-key. Known incompatible OpenAI endpoint / model combinations are rejected before
+Changing providers restores the matching saved profile, if one exists. Otherwise,
+configure that destination’s credential; the previous connection remains saved.
+Clearing a credential affects only the selected connection. Cloud presets cannot
+be enabled without a key. Known incompatible OpenAI endpoint / model combinations are rejected before
 saving or queuing. Failed requests distinguish authentication, connectivity,
 timeout, quota, rate limits, HTTP errors and output truncation using allowlisted
 codes passed through the isolated worker. No provider error bodies are exposed.

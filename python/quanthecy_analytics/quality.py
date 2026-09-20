@@ -6,7 +6,9 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
-VERSION = "research-quality-v1"
+from .volume import cumulative_delta
+
+VERSION = "research-quality-v2"
 STALE_SECONDS = 180
 BAD_FLAGS = {"GAP", "OUT_OF_ORDER", "STALE", "CROSSED_BOOK"}
 
@@ -111,7 +113,10 @@ def window_quality(rows: list[dict[str, Any]], reason: str | None = None) -> Win
     activities = [r["volume"] for r in rows if r["volume"] is not None]
     if len({(v["unit"], v["basis"]) for v in activities}) > 1:
         volume.add("volume_basis_changed")
-    if any(b["value"] < a["value"] for a, b in zip(activities, activities[1:], strict=False)):
+    if all(finite(v["value"]) for v in activities) and any(
+        cumulative_delta(a["value"], b["value"]) < 0
+        for a, b in zip(activities, activities[1:], strict=False)
+    ):
         volume.add("volume_counter_reset")
     return WindowQuality(
         observation_id=rows[-1]["observation_id"] if rows else None,

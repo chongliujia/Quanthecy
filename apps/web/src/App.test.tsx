@@ -11,6 +11,7 @@ function researchResponse(path: string) {
   if (path.endsWith('/research/overview')) return { markets: 0, fresh_markets: 0, reviewed_pairs: 0, evidence_items: 0, latest_observation: null, sources: [], news_polling_enabled: true }
   if (path.endsWith('/comparisons')) return []
   if (path.includes('/evidence?')) return { items: [], total: 0 }
+  if (path.includes('/markets?')) return { items: [], total: 0 }
   return undefined
 }
 

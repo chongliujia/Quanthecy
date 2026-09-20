@@ -32,6 +32,17 @@ class ConfigurationInput(InputSchema):
     enable_thinking: bool = False
 
 
+class ConnectionOut(Schema):
+    id: UUID
+    provider: str
+    base_url: str
+    model: str
+    has_api_key: bool
+    max_output_tokens: int
+    context_window_tokens: int | None
+    enable_thinking: bool
+
+
 class ConfigurationOut(Schema):
     revision: int
     provider: str
@@ -46,6 +57,7 @@ class ConfigurationOut(Schema):
     enable_thinking: bool
     allowed_endpoints: list[str]
     max_output_tokens_limit: int = 65536
+    connections: list[ConnectionOut] = Field(default_factory=list)
 
 
 class AgentStatus(Schema):
@@ -56,6 +68,7 @@ class AgentStatus(Schema):
     runs_today: int
     daily_run_limit: int
     configuration_issue: str = ""
+    max_output_tokens: int | None = None
 
 
 class RunInput(InputSchema):
@@ -89,6 +102,13 @@ class StageManifest(Schema):
     system_sha256: str
 
 
+class StageModelSettings(Schema):
+    provider: str
+    model: str
+    configuration_revision: int
+    max_output_tokens: int
+
+
 class StageOut(Schema):
     id: str
     name: str
@@ -99,6 +119,7 @@ class StageOut(Schema):
     finished_at: datetime | None
     output: RiskReviewOutput | SpecialistOutput | IntelligenceReport | EntryReview | None
     input_packet: dict[str, Any] | None = None
+    model_settings: StageModelSettings | None = None
     usage: dict[str, int]
     error_code: str
     validation_errors: list[ValidationIssue] = Field(default_factory=list)
